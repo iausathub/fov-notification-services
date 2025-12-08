@@ -1,0 +1,33 @@
+@startuml fov_notification_context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+
+title FOV Notification Service - System Context
+
+
+Person(satelliteOp, "Satellite Operators", "Receive observation schedules\nto plan attitude adjustments")
+Person(observatory, "Observatories", "Upload observation schedules and/or\nReceive FOV interference alerts")
+Person(observer, "Observers", "Subscribe to FOV interference\nalerts for their observations")
+
+System(fovService, "FOV Notification Service", "Aggregates telescope schedules\nand notifies users about\nobservations and satellite interference")
+
+
+System_Ext(satchecker, "SatChecker", "Satellite position predictions\nand FOV intersection queries")
+System_Ext(scheduleLink, "Observatory Schedules", "Upcoming Rubin schedule and other\nautomated schedule feeds")
+
+
+' === Relationships ===
+Rel(observatory, fovService, "Uploads schedules")
+Rel(satelliteOp, fovService, "Queries & subscribes")
+Rel(observer, fovService, "Subscribes to alerts")
+
+Rel_Back(satelliteOp, fovService, "Notifies of upcoming observation schedules")
+Rel_Back(observatory, fovService, "FOV interference alerts")
+Rel_Back(observer, fovService, "FOV interference alerts")
+
+Rel(fovService, satchecker, "FOV queries")
+Rel(fovService, scheduleLink, "Poll data")
+
+
+@enduml

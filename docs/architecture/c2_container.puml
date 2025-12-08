@@ -1,0 +1,42 @@
+@startuml fov_notification_container
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title FOV Notification Service - Containers
+
+Person(satelliteOp, "Satellite Operators", "")
+Person(observatory, "Observatories", "")
+Person(observer, "Observers", "")
+
+System_Ext(scheduleAPIs, "Observatory Schedules", "Rubin, others")
+System_Ext(satchecker, "SatChecker", "")
+System_Ext(notifications, "Notification Services", "Email / Pub-Sub")
+
+System_Boundary(fovSystem, "FOV Notification Service") {
+    Container(api, "API", "FastAPI", "Schedule upload & query\nSubscription management\nAuth & rate limiting")
+    Container(statusPage, "Status Page", "HTML/SSE", "Connection health\nLast poll timestamps")
+    Container(scheduler, "Scheduler", "APScheduler or other", "Triggers background jobs\non configured intervals")
+    Container(workers, "Background Workers", "Python", "• Poll observatory APIs\n• Send operator notifications\n• Check FOV interference\n• Archive & cleanup")
+    ContainerDb(db, "Database", "PostgreSQL", "Schedules\nObservations\nSubscriptions\nNotification log")
+    ContainerQueue(redis, "Redis", "", "Job queue\nRate limit tracking\nCache")
+}
+
+Rel(observatory, api, "Upload / subscribe")
+Rel(satelliteOp, api, "Query / subscribe")
+Rel(observer, api, "Subscribe")
+Rel(observatory, statusPage, "View")
+
+
+Rel(api, db, "Read/write")
+Rel(api, redis, "Rate limits / cache")
+Rel(statusPage, db, "Read")
+Rel(scheduler, redis, "Schedules jobs")
+Rel(workers, redis, "Executes jobs")
+Rel(workers, db, "Read/write")
+
+Rel(workers, scheduleAPIs, "Poll")
+Rel(workers, satchecker, "FOV queries")
+Rel(workers, notifications, "Send alerts")
+
+@enduml
