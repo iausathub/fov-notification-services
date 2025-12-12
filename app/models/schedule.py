@@ -19,8 +19,12 @@ class Schedule(Base):
     id = Column(Integer, primary_key=True, index=True)
     observatory_name = Column(String(255), nullable=False, unique=True, index=True)
     source = Column(String(255), nullable=False)  # API endpoint or manual upload
-    schedule_start = Column(DateTime, nullable=False)  # First observation start
-    schedule_end = Column(DateTime, nullable=False)  # Last observation end
+    schedule_start = Column(
+        DateTime(timezone=True), nullable=False
+    )  # First observation start
+    schedule_end = Column(
+        DateTime(timezone=True), nullable=False
+    )  # Last observation end
     created_at = Column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

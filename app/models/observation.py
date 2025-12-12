@@ -33,10 +33,10 @@ class Observation(Base):
     id = Column(Integer, primary_key=True, index=True)
     schedule_id = Column(
         Integer, ForeignKey("schedules.id"), nullable=True
-    )  # NULL once archived
+    )  # NULL for archived
     observatory_name = Column(
         String(255), nullable=False, index=True
-    )  # Denormalized for archive queries
+    )  # Denormalized for use in archive queries
     status = Column(
         Enum(ObservationStatus),
         default=ObservationStatus.SCHEDULED,
@@ -47,8 +47,8 @@ class Observation(Base):
     target_name = Column(String(255), index=True)
     ra = Column(Float)  # Right ascension (degrees)
     dec = Column(Float)  # Declination (degrees)
-    start_time = Column(DateTime, nullable=False, index=True)
-    end_time = Column(DateTime, nullable=False)
+    start_time = Column(DateTime(timezone=True), nullable=False, index=True)
+    end_time = Column(DateTime(timezone=True), nullable=False)
     fov_radius = Column(Float)  # Field of view radius (degrees)
     on_sky_angle = Column(Float)
     instrument = Column(String(255))
