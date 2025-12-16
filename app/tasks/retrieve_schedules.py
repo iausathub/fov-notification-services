@@ -96,7 +96,11 @@ def process_schedule_data(
     Returns:
         The created or updated Schedule record.
     """
-    with db.begin():
+    if len(schedule_data) == 0:
+        logger.info(f"No schedule data for {observatory_name} from {source_url}")
+        return
+
+    with db.begin_nested():
         # Delete existing SCHEDULED observations for this observatory
         db.query(Observation).filter(
             Observation.observatory_name == observatory_name,
@@ -110,32 +114,40 @@ def process_schedule_data(
             .first()
         )
 
-        # Get schedule bounds from observation times
-        schedule_start_mjd = Time(
-            min(obs["t_planning"] for obs in schedule_data), format="mjd"
-        )
-        schedule_start = schedule_start_mjd.to_datetime(timezone=timezone.utc)
-        schedule_end_mjd = Time(
-            max(obs["t_planning"] for obs in schedule_data), format="mjd"
-        )
-        schedule_end = schedule_end_mjd.to_datetime(timezone=timezone.utc)
-        if schedule is None:
-            schedule = Schedule(
-                observatory_name=observatory_name,
-                source=source_url,
-                schedule_start=schedule_start,
-                schedule_end=schedule_end,
-            )
-            db.add(schedule)
-        else:
-            schedule.source = source_url
-            schedule.updated_at = datetime.now(timezone.utc)
+        #########################################################
+        # Rubin Observatory schedule data format
+        #########################################################
 
-            # update schedule_start and schedule_end if they are different from the new schedule
-            if schedule.schedule_start != schedule_start:
-                schedule.schedule_start = schedule_start
-            if schedule.schedule_end != schedule_end:
-                schedule.schedule_end = schedule_end
+        try:
+            # Get schedule bounds from observation times
+            schedule_start_mjd = Time(
+                min(obs["t_planning"] for obs in schedule_data), format="mjd"
+            )
+            schedule_start = schedule_start_mjd.to_datetime(timezone=timezone.utc)
+            schedule_end_mjd = Time(
+                max(obs["t_planning"] for obs in schedule_data), format="mjd"
+            )
+            schedule_end = schedule_end_mjd.to_datetime(timezone=timezone.utc)
+            if schedule is None:
+                schedule = Schedule(
+                    observatory_name=observatory_name,
+                    source=source_url,
+                    schedule_start=schedule_start,
+                    schedule_end=schedule_end,
+                )
+                db.add(schedule)
+            else:
+                schedule.source = source_url
+                schedule.updated_at = datetime.now(timezone.utc)
+
+                # update schedule_start and schedule_end if they are different from the new schedule
+                if schedule.schedule_start != schedule_start:
+                    schedule.schedule_start = schedule_start
+                if schedule.schedule_end != schedule_end:
+                    schedule.schedule_end = schedule_end
+        except Exception as e:
+            logger.error(f"Error processing schedule data for {observatory_name}: {e}")
+            raise ScheduleRetrievalError(f"Error processing schedule data: {e}") from e
 
         # Flush to get schedule.id for new observations
         db.flush()
@@ -165,7 +177,7 @@ def process_schedule_data(
             )
             db.add(observation)
 
-    # Transaction auto-committed on successful exit from `with db.begin():`
+    db.commit()
     logger.info(f"Updated schedule for {observatory_name} from {source_url}")
     return schedule
 
@@ -190,8 +202,8 @@ async def retrieve_schedule(observatory_name: str, url: str) -> None:
     db = SessionLocal()
     try:
         process_schedule_data(db, observatory_name, url, schedule_data)
-    except Exception as e:
-        # Transaction auto-rolled-back by db.begin() context manager on exception
-        logger.exception(f"Failed to process schedule data for {observatory_name}: {e}")
+    except ScheduleRetrievalError as e:
+        # Expected error - log and continue, transaction auto-rolled-back
+        logger.error(f"Failed to process schedule data for {observatory_name}: {e}")
     finally:
         db.close()
