@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.database import SessionLocal
 from app.models.observation import ObservationStatus
@@ -13,7 +13,7 @@ async def cleanup_schedules() -> None:
     db = SessionLocal()
     try:
         # Current time as timezone-aware UTC
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
 
         # For all schedules, move past observations to ARCHIVED status
         for schedule in db.query(Schedule).all():

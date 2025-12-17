@@ -3,10 +3,9 @@
 import os
 
 import pytest
+from app.database import Base
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-
-from app.database import Base
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
@@ -56,10 +55,10 @@ def db_session(db_engine):
     connection = db_engine.connect()
     transaction = connection.begin()
 
-    TestingSessionLocal = sessionmaker(
+    testing_session_local = sessionmaker(
         autocommit=False, autoflush=False, bind=connection
     )
-    session = TestingSessionLocal()
+    session = testing_session_local()
 
     yield session
 

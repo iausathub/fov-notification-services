@@ -1,12 +1,13 @@
 """APScheduler configuration and management."""
 
 import logging
+from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from contextlib import asynccontextmanager
-from app.tasks.retrieve_schedules import retrieve_schedule, close_http_client
+
 from app.tasks.cleanup_schedules import cleanup_schedules
+from app.tasks.retrieve_schedules import close_http_client, retrieve_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +46,8 @@ def add_schedule_retrieval_jobs(sched: AsyncIOScheduler) -> None:
             name=f"Retrieve schedule for {obs_name}",
             replace_existing=True,
         )
-        logger.info(
-            f"Scheduled retrieval for {obs_name} every {config['interval_minutes']} minutes"
-        )
+        interval = config["interval_minutes"]
+        logger.info(f"Scheduled retrieval for {obs_name} every {interval} minutes")
 
 
 def add_schedule_cleanup_jobs(sched: AsyncIOScheduler) -> None:

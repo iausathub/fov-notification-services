@@ -1,5 +1,5 @@
-from app.models.schedule import Schedule
 from app.models.observation import Observation, ObservationStatus
+from app.models.schedule import Schedule
 
 __all__ = [
     "Schedule",

@@ -1,28 +1,29 @@
-"""Tests for scheduled tasks."""
+# ruff: noqa: S101
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
+import httpx
 import pytest
-
 from app.models.observation import Observation, ObservationStatus
 from app.models.schedule import Schedule
 from app.tasks.cleanup_schedules import cleanup_schedules
 from app.tasks.retrieve_schedules import (
-    retrieve_schedule,
+    ScheduleRetrievalError,
     fetch_schedule_data,
     process_schedule_data,
-    ScheduleRetrievalError,
+    retrieve_schedule,
 )
-import httpx
-
 from astropy.time import Time
 
 
 @pytest.fixture
 def schedule_with_observations(db_session):
-    """Create a schedule in the test database with past and future observations for testing."""
-    now = datetime.now(timezone.utc)
+    """
+    Create a schedule in the test database with past and future observations
+    for testing.
+    """
+    now = datetime.now(UTC)
     schedule = Schedule(
         observatory_name="test_observatory",
         source="https://example.com/schedule",
@@ -118,8 +119,8 @@ class TestCleanupSchedules:
         schedule = Schedule(
             observatory_name="empty_observatory",
             source="https://example.com/empty",
-            schedule_start=datetime.now(timezone.utc),
-            schedule_end=datetime.now(timezone.utc) + timedelta(days=1),
+            schedule_start=datetime.now(UTC),
+            schedule_end=datetime.now(UTC) + timedelta(days=1),
         )
         db_session.add(schedule)
         db_session.commit()
@@ -209,15 +210,13 @@ class TestRetrieveSchedules:
                     obs["instrument_name"] for obs in example_schedule_data
                 ]
                 assert obs.start_time in [
-                    Time(obs["t_planning"], format="mjd").to_datetime(
-                        timezone=timezone.utc
-                    )
+                    Time(obs["t_planning"], format="mjd").to_datetime(timezone=UTC)
                     for obs in example_schedule_data
                 ]
                 assert obs.end_time in [
                     Time(
                         obs["t_planning"] + obs["t_exptime"] / 86400, format="mjd"
-                    ).to_datetime(timezone=timezone.utc)
+                    ).to_datetime(timezone=UTC)
                     for obs in example_schedule_data
                 ]
 
@@ -225,7 +224,9 @@ class TestRetrieveSchedules:
     async def test_update_schedule(
         self, db_session, example_schedule_data, new_schedule_data
     ):
-        """Test that the retrieve_schedules task updates the schedule if it already exists."""
+        """
+        Test that the retrieve_schedules task updates the schedule if it already exists.
+        """
 
         # Patch fetch_schedule_data to return the example schedule data
         with patch(
@@ -271,7 +272,10 @@ class TestRetrieveSchedules:
 
     @pytest.mark.asyncio
     async def test_retrieves_schedule_errors(self, db_session):
-        """Test that fetch_schedule_data raises ScheduleRetrievalError and retrieve_schedule handles it correctly."""
+        """
+        Test that fetch_schedule_data raises ScheduleRetrievalError and
+        retrieve_schedule handles it correctly.
+        """
         # Test that fetch_schedule_data raises the error
         with patch("app.tasks.retrieve_schedules.get_http_client") as mock_get_client:
             mock_client = mock_get_client.return_value
@@ -317,7 +321,10 @@ class TestRetrieveSchedules:
     async def test_retrieve_schedule_archived_obs(
         self, db_session, schedule_with_observations, new_schedule_data
     ):
-        """Test that archived observations are not deleted and only future observations are replaced."""
+        """
+        Test that archived observations are not deleted and only future observations
+        are replaced.
+        """
         with patch(
             "app.tasks.retrieve_schedules.SessionLocal", return_value=db_session
         ):
@@ -352,7 +359,8 @@ class TestRetrieveSchedules:
                     "test_new_observatory", "https://example.com/schedule"
                 )
 
-                # Check that a new schedule object is created and has only the new observations
+                # Check that a new schedule object is created and has only the new
+                # observations
                 schedules = db_session.query(Schedule).all()
                 assert len(schedules) == 2
                 assert {s.observatory_name for s in schedules} == {
@@ -380,7 +388,7 @@ class TestRetrieveSchedules:
                         }
                         assert {o.start_time for o in schedule.observations} == {
                             Time(obs["t_planning"], format="mjd").to_datetime(
-                                timezone=timezone.utc
+                                timezone=UTC
                             )
                             for obs in new_schedule_data
                         }
@@ -388,11 +396,12 @@ class TestRetrieveSchedules:
                             Time(
                                 obs["t_planning"] + obs["t_exptime"] / 86400,
                                 format="mjd",
-                            ).to_datetime(timezone=timezone.utc)
+                            ).to_datetime(timezone=UTC)
                             for obs in new_schedule_data
                         }
                     else:
-                        # There are only two schedules so the other one is the test schedule
+                        # There are only two schedules so the other one is the
+                        # test schedule
                         assert len(schedule.observations) == 2
                         assert {o.target_name for o in schedule.observations} == {
                             "Past Target",
@@ -401,7 +410,10 @@ class TestRetrieveSchedules:
 
     @pytest.mark.asyncio
     async def test_retrieve_schedule_bad_data(self, db_session):
-        """Test that a bad schedule data format raises ScheduleRetrievalError from process_schedule_data."""
+        """
+        Test that a bad schedule data format raises ScheduleRetrievalError from
+        process_schedule_data.
+        """
         # Test that process_schedule_data raises the error directly since
         # retrieve_schedule catches ScheduleRetrievalError and logs it
         with pytest.raises(

@@ -1,9 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
-
+from app.routers.schedules import router as schedules_router
 from app.scheduler import lifespan_scheduler
+from fastapi import FastAPI
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,22 +26,38 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="FOV Notification Service",
-    description="Notification service for observation schedules and satellite FOV interference",
+    description="Notification service for observation schedules \
+        and satellite FOV interference",
     version="0.1.0",
     lifespan=lifespan,
 )
 
 
-# TODO: Add routers
+# API routers (authenticated)
+app.include_router(schedules_router)
 
 
-@app.get("/health", tags=["status"])
+@app.get("/", tags=["general"])
+async def root():
+    """Root endpoint."""
+    # TODO: Add real URL for documentation
+    return {
+        "name": "FOV Notification Service",
+        "version": "0.1.0",
+        "description": "Notification service for observation schedules \
+            and satellite FOV interference",
+        "documentation": "http://127.0.0.1:8000/docs",
+    }
+
+
+@app.get("/health", tags=["general"])
 async def health_check():
     """Public health check endpoint."""
     return {"status": "healthy"}
 
 
+# Development server
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

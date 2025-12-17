@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum
-from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 import enum
+from datetime import UTC, datetime
+
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
 
 from app.database import Base
 
@@ -53,9 +54,7 @@ class Observation(Base):
     on_sky_angle = Column(Float)
     instrument = Column(String(255))
 
-    created_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
-    )
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     archived_at = Column(DateTime, nullable=True)
 
     schedule = relationship("Schedule", back_populates="observations")

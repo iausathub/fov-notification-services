@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from datetime import UTC, datetime
+
+from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 
 from app.database import Base
 
@@ -25,13 +26,11 @@ class Schedule(Base):
     schedule_end = Column(
         DateTime(timezone=True), nullable=False
     )  # Last observation end
-    created_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
-    )
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
 
     observations = relationship("Observation", back_populates="schedule")

@@ -1,15 +1,15 @@
 """APScheduler task to retrieve observation schedules from external sources."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
+from astropy.time import Time
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models.observation import Observation, ObservationStatus
 from app.models.schedule import Schedule
-from astropy.time import Time
 
 logger = logging.getLogger(__name__)
 
@@ -123,11 +123,11 @@ def process_schedule_data(
             schedule_start_mjd = Time(
                 min(obs["t_planning"] for obs in schedule_data), format="mjd"
             )
-            schedule_start = schedule_start_mjd.to_datetime(timezone=timezone.utc)
+            schedule_start = schedule_start_mjd.to_datetime(timezone=UTC)
             schedule_end_mjd = Time(
                 max(obs["t_planning"] for obs in schedule_data), format="mjd"
             )
-            schedule_end = schedule_end_mjd.to_datetime(timezone=timezone.utc)
+            schedule_end = schedule_end_mjd.to_datetime(timezone=UTC)
             if schedule is None:
                 schedule = Schedule(
                     observatory_name=observatory_name,
@@ -138,9 +138,10 @@ def process_schedule_data(
                 db.add(schedule)
             else:
                 schedule.source = source_url
-                schedule.updated_at = datetime.now(timezone.utc)
+                schedule.updated_at = datetime.now(UTC)
 
-                # update schedule_start and schedule_end if they are different from the new schedule
+                # update schedule_start and schedule_end if they are different
+                # from the new schedule
                 if schedule.schedule_start != schedule_start:
                     schedule.schedule_start = schedule_start
                 if schedule.schedule_end != schedule_end:
@@ -155,13 +156,13 @@ def process_schedule_data(
         # Create new SCHEDULED observations for the new schedule
         for obs_data in schedule_data:
             start_time = Time(obs_data.get("t_planning"), format="mjd").to_datetime(
-                timezone=timezone.utc
+                timezone=UTC
             )
             # convert t_exptime from seconds to days
             t_exptime_days = obs_data.get("t_exptime") / 86400
             end_time = Time(
                 obs_data.get("t_planning") + t_exptime_days, format="mjd"
-            ).to_datetime(timezone=timezone.utc)
+            ).to_datetime(timezone=UTC)
             observation = Observation(
                 schedule_id=schedule.id,
                 observatory_name=observatory_name,
