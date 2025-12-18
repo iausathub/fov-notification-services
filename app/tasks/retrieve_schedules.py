@@ -77,6 +77,9 @@ def process_schedule_data(
     observatory_name: str,
     source_url: str,
     schedule_data: dict,
+    observatory_latitude: float,
+    observatory_longitude: float,
+    observatory_elevation: float,
 ) -> Schedule:
     """Process and store schedule data in the database.
 
@@ -92,6 +95,9 @@ def process_schedule_data(
         observatory_name: Name of the observatory.
         source_url: The URL the data was fetched from.
         schedule_data: The parsed schedule data.
+        observatory_latitude: Latitude of the observatory in degrees.
+        observatory_longitude: Longitude of the observatory in degrees.
+        observatory_elevation: Elevation of the observatory in meters.
 
     Returns:
         The created or updated Schedule record.
@@ -131,6 +137,9 @@ def process_schedule_data(
             if schedule is None:
                 schedule = Schedule(
                     observatory_name=observatory_name,
+                    observatory_latitude=observatory_latitude,
+                    observatory_longitude=observatory_longitude,
+                    observatory_elevation=observatory_elevation,
                     source=source_url,
                     schedule_start=schedule_start,
                     schedule_end=schedule_end,
@@ -183,7 +192,13 @@ def process_schedule_data(
     return schedule
 
 
-async def retrieve_schedule(observatory_name: str, url: str) -> None:
+async def retrieve_schedule(
+    observatory_name: str,
+    url: str,
+    observatory_latitude: float,
+    observatory_longitude: float,
+    observatory_elevation: float,
+) -> None:
     """Main task to retrieve and store schedule data for an observatory.
 
     This is the function to be called by APScheduler.
@@ -191,6 +206,9 @@ async def retrieve_schedule(observatory_name: str, url: str) -> None:
     Args:
         observatory_name: Name of the observatory to retrieve schedule for.
         url: The API endpoint to fetch schedule data from.
+        observatory_latitude: Latitude of the observatory in degrees.
+        observatory_longitude: Longitude of the observatory in degrees.
+        observatory_elevation: Elevation of the observatory in meters.
     """
     logger.info(f"Retrieving schedule for {observatory_name} from {url}")
 
@@ -202,7 +220,15 @@ async def retrieve_schedule(observatory_name: str, url: str) -> None:
 
     db = SessionLocal()
     try:
-        process_schedule_data(db, observatory_name, url, schedule_data)
+        process_schedule_data(
+            db,
+            observatory_name,
+            url,
+            schedule_data,
+            observatory_latitude,
+            observatory_longitude,
+            observatory_elevation,
+        )
     except ScheduleRetrievalError as e:
         # Expected error - log and continue, transaction auto-rolled-back
         logger.error(f"Failed to process schedule data for {observatory_name}: {e}")

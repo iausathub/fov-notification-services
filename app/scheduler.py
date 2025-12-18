@@ -20,6 +20,9 @@ OBSERVATORY_SCHEDULES = {
     "Rubin": {
         "url": "https://usdf-rsp.slac.stanford.edu/obsloctap/schedule",
         "interval_minutes": 10,
+        "latitude": -30.244633,
+        "longitude": -70.749417,
+        "elevation": 2647.0,
     },
 }
 
@@ -41,7 +44,13 @@ def add_schedule_retrieval_jobs(sched: AsyncIOScheduler) -> None:
         sched.add_job(
             retrieve_schedule,
             trigger=IntervalTrigger(minutes=config["interval_minutes"]),
-            args=[obs_name, config["url"]],
+            args=[
+                obs_name,
+                config["url"],
+                config["latitude"],
+                config["longitude"],
+                config["elevation"],
+            ],
             id=f"retrieve_schedule_{obs_name}",
             name=f"Retrieve schedule for {obs_name}",
             replace_existing=True,

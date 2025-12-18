@@ -24,6 +24,9 @@ class ScheduleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     observatory_name: str
+    observatory_latitude: float
+    observatory_longitude: float
+    observatory_elevation: float
     schedule_start: datetime
     schedule_end: datetime
     created_at: datetime

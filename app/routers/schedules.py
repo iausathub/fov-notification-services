@@ -51,6 +51,9 @@ async def get_full_schedule(
         result.append(
             ScheduleResponse(
                 observatory_name=schedule.observatory_name,
+                observatory_latitude=schedule.observatory_latitude,
+                observatory_longitude=schedule.observatory_longitude,
+                observatory_elevation=schedule.observatory_elevation,
                 schedule_start=schedule.schedule_start,
                 schedule_end=schedule.schedule_end,
                 created_at=schedule.created_at,
@@ -113,6 +116,9 @@ async def get_observatory_schedule(
 
     return ScheduleResponse(
         observatory_name=schedule.observatory_name,
+        observatory_latitude=schedule.observatory_latitude,
+        observatory_longitude=schedule.observatory_longitude,
+        observatory_elevation=schedule.observatory_elevation,
         schedule_start=schedule.schedule_start,
         schedule_end=schedule.schedule_end,
         created_at=schedule.created_at,

@@ -1,9 +1,10 @@
-"""Pytest fixtures for the test suite."""
-
 import os
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from app.database import Base
+from app.models.observation import Observation, ObservationStatus
+from app.models.schedule import Schedule
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
@@ -65,3 +66,55 @@ def db_session(db_engine):
     session.close()
     transaction.rollback()
     connection.close()
+
+
+@pytest.fixture
+def create_schedule(db_session):
+    """Factory fixture to create schedules with custom observatory names."""
+
+    def _create(observatory_name="test_observatory"):
+        now = datetime.now(UTC)
+        schedule = Schedule(
+            observatory_name=observatory_name,
+            observatory_latitude=100.0,
+            observatory_longitude=10.0,
+            observatory_elevation=1000.0,
+            source="https://example.com/schedule",
+            schedule_start=now - timedelta(days=2),
+            schedule_end=now + timedelta(days=2),
+        )
+        db_session.add(schedule)
+        db_session.flush()
+
+        # Past observation (archived)
+        past_obs = Observation(
+            schedule_id=schedule.id,
+            observatory_name=observatory_name,
+            status=ObservationStatus.ARCHIVED,
+            target_name="Past Target",
+            ra=180.0,
+            dec=45.0,
+            start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(hours=1),
+            fov_radius=1.5,
+        )
+
+        # Future observation (scheduled)
+        future_obs = Observation(
+            schedule_id=schedule.id,
+            observatory_name=observatory_name,
+            status=ObservationStatus.SCHEDULED,
+            target_name="Future Target",
+            ra=90.0,
+            dec=-30.0,
+            start_time=now + timedelta(hours=1),
+            end_time=now + timedelta(hours=2),
+            fov_radius=1.5,
+        )
+
+        db_session.add_all([past_obs, future_obs])
+        db_session.commit()
+
+        return schedule
+
+    return _create

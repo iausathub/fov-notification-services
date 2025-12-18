@@ -18,48 +18,6 @@ from astropy.time import Time
 
 
 @pytest.fixture
-def schedule_with_observations(db_session):
-    """
-    Create a schedule in the test database with past and future observations
-    for testing.
-    """
-    now = datetime.now(UTC)
-    schedule = Schedule(
-        observatory_name="test_observatory",
-        source="https://example.com/schedule",
-        schedule_start=now - timedelta(days=2),
-        schedule_end=now + timedelta(days=2),
-    )
-    db_session.add(schedule)
-    db_session.flush()
-    # Past observation (should be archived)
-    past_obs = Observation(
-        schedule_id=schedule.id,
-        observatory_name="test_observatory",
-        status=ObservationStatus.ARCHIVED,
-        target_name="Past Target",
-        ra=180.0,
-        dec=45.0,
-        start_time=now - timedelta(hours=2),
-        end_time=now - timedelta(hours=1),
-    )
-    # Future observation (should remain SCHEDULED)
-    future_obs = Observation(
-        schedule_id=schedule.id,
-        observatory_name="test_observatory",
-        status=ObservationStatus.SCHEDULED,
-        target_name="Future Target",
-        ra=90.0,
-        dec=-30.0,
-        start_time=now + timedelta(hours=1),
-        end_time=now + timedelta(hours=2),
-    )
-    db_session.add_all([past_obs, future_obs])
-    db_session.commit()
-    return schedule
-
-
-@pytest.fixture
 def new_schedule_data():
     """Example new schedule data (format from the Rubin schedule API)"""
     return [
@@ -79,10 +37,9 @@ class TestCleanupSchedules:
     """Tests for the cleanup_schedules task."""
 
     @pytest.mark.asyncio
-    async def test_archives_past_observations(
-        self, db_session, schedule_with_observations
-    ):
+    async def test_archives_past_observations(self, db_session, create_schedule):
         """Test that past observations are moved to ARCHIVED status."""
+        create_schedule("test_observatory")
         # Patch SessionLocal to return the test session
         with patch("app.tasks.cleanup_schedules.SessionLocal", return_value=db_session):
             await cleanup_schedules()
@@ -97,10 +54,9 @@ class TestCleanupSchedules:
         assert past_obs.archived_at is not None
 
     @pytest.mark.asyncio
-    async def test_preserves_future_observations(
-        self, db_session, schedule_with_observations
-    ):
+    async def test_preserves_future_observations(self, db_session, create_schedule):
         """Test that future observations remain in SCHEDULED status."""
+        create_schedule("test_observatory")
         with patch("app.tasks.cleanup_schedules.SessionLocal", return_value=db_session):
             await cleanup_schedules()
 
@@ -118,6 +74,9 @@ class TestCleanupSchedules:
         """Test that cleanup handles schedules with no observations gracefully."""
         schedule = Schedule(
             observatory_name="empty_observatory",
+            observatory_latitude=0.0,
+            observatory_longitude=0.0,
+            observatory_elevation=0.0,
             source="https://example.com/empty",
             schedule_start=datetime.now(UTC),
             schedule_end=datetime.now(UTC) + timedelta(days=1),
@@ -187,7 +146,7 @@ class TestRetrieveSchedules:
                 "app.tasks.retrieve_schedules.SessionLocal", return_value=db_session
             ):
                 await retrieve_schedule(
-                    "test_observatory", "https://example.com/schedule"
+                    "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
                 )
 
             # Verify: future observations should be replaced with the new schedule
@@ -237,7 +196,7 @@ class TestRetrieveSchedules:
                 return_value=example_schedule_data,
             ):
                 await retrieve_schedule(
-                    "test_observatory", "https://example.com/schedule"
+                    "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
                 )
 
                 future_obs = (
@@ -251,7 +210,7 @@ class TestRetrieveSchedules:
                 return_value=new_schedule_data,
             ):
                 await retrieve_schedule(
-                    "test_observatory", "https://example.com/schedule"
+                    "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
                 )
 
                 future_obs = (
@@ -294,14 +253,13 @@ class TestRetrieveSchedules:
             ):
                 # Should not raise - error is caught and logged
                 await retrieve_schedule(
-                    "test_observatory", "https://example.com/schedule"
+                    "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
                 )
 
     @pytest.mark.asyncio
-    async def test_retrieve_empty_schedule(
-        self, db_session, schedule_with_observations
-    ):
+    async def test_retrieve_empty_schedule(self, db_session, create_schedule):
         """Test that an empty schedule does not delete any observations."""
+        create_schedule("test_observatory")
         with patch(
             "app.tasks.retrieve_schedules.SessionLocal", return_value=db_session
         ):
@@ -309,7 +267,7 @@ class TestRetrieveSchedules:
                 "app.tasks.retrieve_schedules.fetch_schedule_data", return_value=[]
             ):
                 await retrieve_schedule(
-                    "test_observatory", "https://example.com/schedule"
+                    "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
                 )
 
         # Fixture creates 2 observations: "Past Target" and "Future Target"
@@ -319,12 +277,10 @@ class TestRetrieveSchedules:
 
     @pytest.mark.asyncio
     async def test_retrieve_schedule_archived_obs(
-        self, db_session, schedule_with_observations, new_schedule_data
+        self, db_session, create_schedule, new_schedule_data
     ):
-        """
-        Test that archived observations are not deleted and only future observations
-        are replaced.
-        """
+        """Test that archived obs are not deleted and future obs are replaced."""
+        create_schedule("test_observatory")
         with patch(
             "app.tasks.retrieve_schedules.SessionLocal", return_value=db_session
         ):
@@ -333,7 +289,7 @@ class TestRetrieveSchedules:
                 return_value=new_schedule_data,
             ):
                 await retrieve_schedule(
-                    "test_observatory", "https://example.com/schedule"
+                    "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
                 )
 
         obs = db_session.query(Observation).all()
@@ -344,10 +300,11 @@ class TestRetrieveSchedules:
 
     @pytest.mark.asyncio
     async def test_retrieve_schedule_new_obs(
-        self, db_session, schedule_with_observations, new_schedule_data
+        self, db_session, create_schedule, new_schedule_data
     ):
         """Test that a new schedule object is created if it does not exist, and that
         future observations are associate with the correct schedule."""
+        create_schedule("test_observatory")
         with patch(
             "app.tasks.retrieve_schedules.SessionLocal", return_value=db_session
         ):
@@ -356,7 +313,11 @@ class TestRetrieveSchedules:
                 return_value=new_schedule_data,
             ):
                 await retrieve_schedule(
-                    "test_new_observatory", "https://example.com/schedule"
+                    "test_new_observatory",
+                    "https://example.com/schedule",
+                    200.0,
+                    20.0,
+                    2000.0,
                 )
 
                 # Check that a new schedule object is created and has only the new
@@ -370,6 +331,11 @@ class TestRetrieveSchedules:
 
                 for schedule in schedules:
                     if schedule.observatory_name == "test_new_observatory":
+                        # Check that the observatory location is set correctly
+                        assert schedule.observatory_latitude == 200.0
+                        assert schedule.observatory_longitude == 20.0
+                        assert schedule.observatory_elevation == 2000.0
+
                         assert len(schedule.observations) == len(new_schedule_data)
                         assert {o.target_name for o in schedule.observations} == {
                             obs["target_name"] for obs in new_schedule_data
@@ -424,4 +390,7 @@ class TestRetrieveSchedules:
                 "test_observatory",
                 "https://example.com/schedule",
                 ["not a valid schedule"],
+                0.0,
+                0.0,
+                0.0,
             )

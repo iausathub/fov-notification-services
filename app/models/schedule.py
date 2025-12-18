@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Column, DateTime, Float, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -19,6 +19,9 @@ class Schedule(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     observatory_name = Column(String(255), nullable=False, unique=True, index=True)
+    observatory_latitude = Column(Float, nullable=False)
+    observatory_longitude = Column(Float, nullable=False)
+    observatory_elevation = Column(Float, nullable=False)
     source = Column(String(255), nullable=False)  # API endpoint or manual upload
     schedule_start = Column(
         DateTime(timezone=True), nullable=False
