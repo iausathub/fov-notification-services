@@ -10,6 +10,7 @@ dependencies = [
     "astropy>=7.2.0",
     "fastapi[standard]>=0.124.0",
     "httpx>=0.28.0",
+    "mypy>=1.19.1",
     "psycopg2-binary>=2.9.11",
     "sqlalchemy>=2.0.45",
 ]
@@ -28,3 +29,30 @@ dev = [
 [tool.ruff]
 lint.select = ["E", "F", "I", "N", "UP", "S", "B"]
 src = ["app", "tests"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_unreachable = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+explicit_package_bases = true
+
+exclude = [
+    "alembic/",
+    "docs/",
+    "tests/",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "astropy.*",
+    "apscheduler.*",
+]
+ignore_missing_imports = true

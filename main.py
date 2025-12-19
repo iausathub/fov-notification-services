@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from app.routers.schedules import router as schedules_router
+from app.routers.status import router as status_router
 from app.scheduler import lifespan_scheduler
 from fastapi import FastAPI
 
@@ -9,6 +10,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
+logging.getLogger("apscheduler.executors.base").setLevel(logging.CRITICAL)
 logger = logging.getLogger(__name__)
 
 
@@ -35,6 +37,7 @@ app = FastAPI(
 
 # API routers (authenticated)
 app.include_router(schedules_router)
+app.include_router(status_router)
 
 
 @app.get("/", tags=["general"])
@@ -44,8 +47,10 @@ async def root():
     return {
         "name": "FOV Notification Service",
         "version": "0.1.0",
-        "description": "Notification service for observation schedules \
-            and satellite FOV interference",
+        "description": (
+            "Notification service for observation schedules "
+            "and satellite FOV interference"
+        ),
         "documentation": "http://127.0.0.1:8000/docs",
     }
 

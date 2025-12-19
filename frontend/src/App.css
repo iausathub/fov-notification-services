@@ -1,0 +1,65 @@
+#root {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.status-container {
+  text-align: left;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-weight: bold;
+  margin-bottom: 1.5rem;
+}
+
+.status-badge.healthy {
+  background: #10b981;
+  color: white;
+}
+
+.status-badge.degraded {
+  background: #f59e0b;
+  color: white;
+}
+
+.status-badge.unhealthy {
+  background: #ef4444;
+  color: white;
+}
+
+.job-card {
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-left: 4px solid;
+}
+
+.job-card.healthy {
+  border-left-color: #10b981;
+}
+
+.job-card.unhealthy {
+  border-left-color: #ef4444;
+}
+
+.job-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.job-card p {
+  margin: 0.5rem 0 0;
+  color: #888;
+}
+
+.job-card .error {
+  color: #ef4444;
+}

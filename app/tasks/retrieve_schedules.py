@@ -42,7 +42,7 @@ class ScheduleRetrievalError(Exception):
     pass
 
 
-async def fetch_schedule_data(url: str) -> dict:
+async def fetch_schedule_data(url: str) -> list[dict]:
     """Fetch schedule data from the given URL.
 
     Args:
@@ -60,7 +60,8 @@ async def fetch_schedule_data(url: str) -> dict:
         response = await client.get(url)
         response.raise_for_status()
         logger.info(f"Schedule fetched from {url}")
-        return response.json()
+        data: list[dict] = response.json()
+        return data
     except httpx.TimeoutException as e:
         logger.error(f"Timeout fetching schedule from {url}: {e}")
         raise ScheduleRetrievalError(f"Request timed out: {url}") from e
@@ -76,11 +77,11 @@ def process_schedule_data(
     db: Session,
     observatory_name: str,
     source_url: str,
-    schedule_data: dict,
+    schedule_data: list[dict],
     observatory_latitude: float,
     observatory_longitude: float,
     observatory_elevation: float,
-) -> Schedule:
+) -> Schedule | None:
     """Process and store schedule data in the database.
 
     Implements the schedule replacement logic:
@@ -100,11 +101,11 @@ def process_schedule_data(
         observatory_elevation: Elevation of the observatory in meters.
 
     Returns:
-        The created or updated Schedule record.
+        The created or updated Schedule record, or None if no schedule data.
     """
     if len(schedule_data) == 0:
         logger.info(f"No schedule data for {observatory_name} from {source_url}")
-        return
+        return None
 
     with db.begin_nested():
         # Delete existing SCHEDULED observations for this observatory
@@ -164,14 +165,15 @@ def process_schedule_data(
 
         # Create new SCHEDULED observations for the new schedule
         for obs_data in schedule_data:
-            start_time = Time(obs_data.get("t_planning"), format="mjd").to_datetime(
+            t_planning: float = obs_data["t_planning"]
+            t_exptime: float = obs_data["t_exptime"]
+
+            start_time = Time(t_planning, format="mjd").to_datetime(timezone=UTC)
+            # convert t_exptime from seconds to days
+            t_exptime_days = t_exptime / 86400
+            end_time = Time(t_planning + t_exptime_days, format="mjd").to_datetime(
                 timezone=UTC
             )
-            # convert t_exptime from seconds to days
-            t_exptime_days = obs_data.get("t_exptime") / 86400
-            end_time = Time(
-                obs_data.get("t_planning") + t_exptime_days, format="mjd"
-            ).to_datetime(timezone=UTC)
             observation = Observation(
                 schedule_id=schedule.id,
                 observatory_name=observatory_name,
@@ -215,8 +217,8 @@ async def retrieve_schedule(
     try:
         schedule_data = await fetch_schedule_data(url)
     except ScheduleRetrievalError:
-        # Error already logged, just return
-        return
+        # Re-raise so APScheduler event listener sees the error
+        raise
 
     db = SessionLocal()
     try:
@@ -229,8 +231,8 @@ async def retrieve_schedule(
             observatory_longitude,
             observatory_elevation,
         )
-    except ScheduleRetrievalError as e:
-        # Expected error - log and continue, transaction auto-rolled-back
-        logger.error(f"Failed to process schedule data for {observatory_name}: {e}")
+    except ScheduleRetrievalError:
+        # Re-raise so APScheduler event listener sees the error
+        raise
     finally:
         db.close()

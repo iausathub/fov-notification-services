@@ -1,9 +1,13 @@
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, DateTime, Float, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.observation import Observation
 
 
 class Schedule(Base):
@@ -17,23 +21,28 @@ class Schedule(Base):
 
     __tablename__ = "schedules"
 
-    id = Column(Integer, primary_key=True, index=True)
-    observatory_name = Column(String(255), nullable=False, unique=True, index=True)
-    observatory_latitude = Column(Float, nullable=False)
-    observatory_longitude = Column(Float, nullable=False)
-    observatory_elevation = Column(Float, nullable=False)
-    source = Column(String(255), nullable=False)  # API endpoint or manual upload
-    schedule_start = Column(
-        DateTime(timezone=True), nullable=False
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    observatory_name: Mapped[str] = mapped_column(
+        String(255), nullable=False, unique=True, index=True
+    )
+    observatory_latitude: Mapped[float] = mapped_column(nullable=False)
+    observatory_longitude: Mapped[float] = mapped_column(nullable=False)
+    observatory_elevation: Mapped[float] = mapped_column(nullable=False)
+    source: Mapped[str] = mapped_column(
+        String(255), nullable=False
+    )  # API endpoint or manual upload
+    schedule_start: Mapped[datetime] = mapped_column(
+        nullable=False
     )  # First observation start
-    schedule_end = Column(
-        DateTime(timezone=True), nullable=False
+    schedule_end: Mapped[datetime] = mapped_column(
+        nullable=False
     )  # Last observation end
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
-    updated_at = Column(
-        DateTime(timezone=True),
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime | None] = mapped_column(
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
     )
 
-    observations = relationship("Observation", back_populates="schedule")
+    observations: Mapped[list["Observation"]] = relationship(
+        "Observation", back_populates="schedule"
+    )
