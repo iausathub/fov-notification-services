@@ -63,9 +63,11 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
+        working-directory: services/operator
         run: uv sync --group dev
 
       - name: Run tests
+        working-directory: services/operator
         run: uv run pytest -v
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_fov_notifications
