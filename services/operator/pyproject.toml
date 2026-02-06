@@ -5,6 +5,7 @@ description = "Notification service for observation schedules and satellite FOV 
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aio-pika>=9.5.8",
     "alembic>=1.17.2",
     "apscheduler>=3.10.4",
     "astropy>=7.2.0",
@@ -12,6 +13,7 @@ dependencies = [
     "httpx>=0.28.0",
     "psycopg2-binary>=2.9.11",
     "sqlalchemy>=2.0.45",
+    "websockets>=16.0",
 ]
 
 [dependency-groups]

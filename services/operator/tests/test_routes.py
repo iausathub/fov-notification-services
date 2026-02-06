@@ -2,8 +2,8 @@
 import pytest
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.main import app
 from fastapi.testclient import TestClient
-from main import app
 
 
 @pytest.fixture
