@@ -304,7 +304,7 @@ class TestRetrieveSchedules:
     ):
         """Test that a new schedule object is created if it does not exist, and that
         future observations are associate with the correct schedule."""
-        create_schedule("test_observatory")
+        create_schedule("Test_Observatory")
         with patch(
             "app.tasks.retrieve_schedules.SessionLocal", return_value=db_session
         ):
@@ -325,12 +325,12 @@ class TestRetrieveSchedules:
                 schedules = db_session.query(Schedule).all()
                 assert len(schedules) == 2
                 assert {s.observatory_name for s in schedules} == {
-                    "test_new_observatory",
-                    "test_observatory",
+                    "Test_New_Observatory",
+                    "Test_Observatory",
                 }
 
                 for schedule in schedules:
-                    if schedule.observatory_name == "test_new_observatory":
+                    if schedule.observatory_name == "Test_New_Observatory":
                         # Check that the observatory location is set correctly
                         assert schedule.observatory_latitude == 200.0
                         assert schedule.observatory_longitude == 20.0

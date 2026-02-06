@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 import httpx
 from astropy.time import Time
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
@@ -106,17 +107,23 @@ def process_schedule_data(
         logger.info(f"No schedule data for {observatory_name} from {source_url}")
         return
 
+    # Normalize observatory name to title case for consistency
+    # This prevents duplicates like "Rubin" and "rubin"
+    normalized_name = observatory_name.title()
+
     with db.begin_nested():
         # Delete existing SCHEDULED observations for this observatory
         db.query(Observation).filter(
-            Observation.observatory_name == observatory_name,
+            func.lower(Observation.observatory_name) == func.lower(normalized_name),
             Observation.status == ObservationStatus.SCHEDULED,
         ).delete(synchronize_session=False)
 
         # Get or create schedule record
         schedule = (
             db.query(Schedule)
-            .filter(Schedule.observatory_name == observatory_name)
+            .filter(
+                func.lower(Schedule.observatory_name) == func.lower(normalized_name)
+            )
             .first()
         )
 
@@ -136,7 +143,7 @@ def process_schedule_data(
             schedule_end = schedule_end_mjd.to_datetime(timezone=UTC)
             if schedule is None:
                 schedule = Schedule(
-                    observatory_name=observatory_name,
+                    observatory_name=normalized_name,
                     observatory_latitude=observatory_latitude,
                     observatory_longitude=observatory_longitude,
                     observatory_elevation=observatory_elevation,
@@ -174,7 +181,7 @@ def process_schedule_data(
             ).to_datetime(timezone=UTC)
             observation = Observation(
                 schedule_id=schedule.id,
-                observatory_name=observatory_name,
+                observatory_name=normalized_name,
                 status=ObservationStatus.SCHEDULED,
                 target_name=obs_data.get("target_name"),
                 ra=obs_data.get("s_ra"),
@@ -188,7 +195,7 @@ def process_schedule_data(
             db.add(observation)
 
     db.commit()
-    logger.info(f"Updated schedule for {observatory_name} from {source_url}")
+    logger.info(f"Updated schedule for {normalized_name} from {source_url}")
     return schedule
 
 
@@ -219,8 +226,9 @@ async def retrieve_schedule(
         return
 
     db = SessionLocal()
+    schedule_dict = None
     try:
-        process_schedule_data(
+        schedule = process_schedule_data(
             db,
             observatory_name,
             url,
@@ -229,8 +237,41 @@ async def retrieve_schedule(
             observatory_longitude,
             observatory_elevation,
         )
-    except ScheduleRetrievalError as e:
-        # Expected error - log and continue, transaction auto-rolled-back
-        logger.error(f"Failed to process schedule data for {observatory_name}: {e}")
+
+        # Publish notification to RabbitMQ if schedule was updated
+        if schedule:
+            schedule_dict = {
+                "id": schedule.id,
+                "observatory_name": schedule.observatory_name,
+                "schedule_start": (
+                    schedule.schedule_start.isoformat()
+                    if schedule.schedule_start
+                    else None
+                ),
+                "schedule_end": (
+                    schedule.schedule_end.isoformat() if schedule.schedule_end else None
+                ),
+                "updated_at": (
+                    schedule.updated_at.isoformat() if schedule.updated_at else None
+                ),
+                "observation_count": len(schedule_data),
+                # TODO: Add actual observation data
+            }
+
+    except ScheduleRetrievalError:
+        # Re-raise so APScheduler event listener sees the error
+        raise
     finally:
         db.close()
+
+    # Publish notification to RabbitMQ after DB session is closed
+    if schedule_dict:
+        # TODO: Implement notification
+        pass
+        """
+        try:
+            await notify_schedule_update(observatory_name, schedule_dict)
+        except Exception as e:
+            # Log but don't fail the schedule retrieval if notification fails
+            logger.error(f"Failed to publish schedule update notification: {e}")
+        """

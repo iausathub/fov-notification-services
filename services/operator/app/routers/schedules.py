@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -24,10 +25,14 @@ async def get_full_schedule(
         24, ge=1, le=48, description="Hours ahead to include (max 2 days)"
     ),
 ):
-    """Get combined schedule for all observatories.
+    """Get a combined planned schedule of where and when telescopes plan to point for
+    all supported ground-based astronomical observatories.
 
-    Returns a list of schedules (one per observatory), each containing
-    observations within the next N hours, sorted by start time.
+    Returns a list of schedules (one per observatory), each containing planned
+    observations of the sky within the next N hours, sorted by start time.
+
+    Planned observations are subject to change and updated on a best effort basis by
+    individual observatories.
     """
     now = datetime.now(UTC)
     end_time = now + timedelta(hours=hours)
@@ -82,7 +87,9 @@ async def get_observatory_schedule(
     or all scheduled observations if hours is not specified.
     """
     schedule = (
-        db.query(Schedule).filter(Schedule.observatory_name == observatory_name).first()
+        db.query(Schedule)
+        .filter(func.lower(Schedule.observatory_name) == func.lower(observatory_name))
+        .first()
     )
 
     if not schedule:
