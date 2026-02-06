@@ -3,9 +3,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from routers.schedules import router as schedules_router
-from routers.status import router as status_router
-from scheduler import lifespan_scheduler
+from .routers.schedules import router as schedules_router
+from .routers.status import router as status_router
+from .scheduler import lifespan_scheduler
 
 logging.basicConfig(
     level=logging.INFO,

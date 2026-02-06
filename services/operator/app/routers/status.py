@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from scheduler import job_status
+from app.scheduler import job_status
 
 router = APIRouter(
     prefix="/status",

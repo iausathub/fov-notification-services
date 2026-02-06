@@ -72,7 +72,7 @@ def db_session(db_engine):
 def create_schedule(db_session):
     """Factory fixture to create schedules with custom observatory names."""
 
-    def _create(observatory_name="test_observatory"):
+    def _create(observatory_name="Test_Observatory"):
         now = datetime.now(UTC)
         schedule = Schedule(
             observatory_name=observatory_name,

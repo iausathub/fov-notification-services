@@ -1,9 +1,9 @@
 import logging
 from datetime import UTC, datetime
 
-from database import SessionLocal
-from models.observation import ObservationStatus
-from models.schedule import Schedule
+from app.database import SessionLocal
+from app.models.observation import ObservationStatus
+from app.models.schedule import Schedule
 
 logger = logging.getLogger(__name__)
 

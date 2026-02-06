@@ -8,9 +8,9 @@ from astropy.time import Time
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from database import SessionLocal
-from models.observation import Observation, ObservationStatus
-from models.schedule import Schedule
+from app.database import SessionLocal
+from app.models.observation import Observation, ObservationStatus
+from app.models.schedule import Schedule
 
 logger = logging.getLogger(__name__)
 

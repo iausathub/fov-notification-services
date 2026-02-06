@@ -8,8 +8,8 @@ from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, JobExecution
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from tasks.cleanup_schedules import cleanup_schedules
-from tasks.retrieve_schedules import close_http_client, retrieve_schedule
+from .tasks.cleanup_schedules import cleanup_schedules
+from .tasks.retrieve_schedules import close_http_client, retrieve_schedule
 
 logger = logging.getLogger(__name__)
 

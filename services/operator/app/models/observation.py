@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
-from database import Base
+from app.database import Base
 
 
 class ObservationStatus(enum.Enum):

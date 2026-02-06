@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from sqlalchemy import Column, DateTime, Float, Integer, String
 from sqlalchemy.orm import relationship
 
-from database import Base
+from app.database import Base
 
 
 class Schedule(Base):

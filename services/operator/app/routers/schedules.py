@@ -5,11 +5,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from database import get_db
-from dependencies import get_current_user
-from models.observation import ObservationStatus
-from models.schedule import Schedule
-from schemas.schedule import MultipleScheduleResponse, ScheduleResponse
+from app.database import get_db
+from app.dependencies import get_current_user
+from app.models.observation import ObservationStatus
+from app.models.schedule import Schedule
+from app.schemas.schedule import MultipleScheduleResponse, ScheduleResponse
 
 router = APIRouter(
     prefix="/schedule",
