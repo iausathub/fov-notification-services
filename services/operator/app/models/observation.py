@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 import enum
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.schedule import Schedule
 
 
 class ObservationStatus(enum.Enum):
@@ -31,30 +37,38 @@ class Observation(Base):
 
     __tablename__ = "observations"
 
-    id = Column(Integer, primary_key=True, index=True)
-    schedule_id = Column(
-        Integer, ForeignKey("schedules.id"), nullable=True
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    schedule_id: Mapped[int | None] = mapped_column(
+        ForeignKey("schedules.id"), nullable=True
     )  # NULL for archived
-    observatory_name = Column(
+    observatory_name: Mapped[str] = mapped_column(
         String(255), nullable=False, index=True
     )  # Denormalized for use in archive queries
-    status = Column(
+    status: Mapped[ObservationStatus] = mapped_column(
         Enum(ObservationStatus),
         default=ObservationStatus.SCHEDULED,
         nullable=False,
         index=True,
     )
 
-    target_name = Column(String(255), index=True)
-    ra = Column(Float)  # Right ascension (degrees)
-    dec = Column(Float)  # Declination (degrees)
-    start_time = Column(DateTime(timezone=True), nullable=False, index=True)
-    end_time = Column(DateTime(timezone=True), nullable=False)
-    fov_radius = Column(Float)  # Field of view radius (degrees)
-    on_sky_angle = Column(Float)
-    instrument = Column(String(255))
+    target_name: Mapped[str | None] = mapped_column(String(255), index=True)
+    ra: Mapped[float | None] = mapped_column(Float)  # Right ascension (degrees)
+    dec: Mapped[float | None] = mapped_column(Float)  # Declination (degrees)
+    start_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    fov_radius: Mapped[float | None] = mapped_column(Float)  # Field of view radius
+    on_sky_angle: Mapped[float | None] = mapped_column(Float)
+    instrument: Mapped[str | None] = mapped_column(String(255))
 
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
-    archived_at = Column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
-    schedule = relationship("Schedule", back_populates="observations")
+    schedule: Mapped[Schedule | None] = relationship(
+        "Schedule", back_populates="observations"
+    )

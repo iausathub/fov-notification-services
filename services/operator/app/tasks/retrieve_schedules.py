@@ -2,6 +2,7 @@
 
 import logging
 from datetime import UTC, datetime
+from typing import Any, cast
 
 import httpx
 from astropy.time import Time
@@ -61,7 +62,7 @@ async def fetch_schedule_data(url: str) -> dict:
         response = await client.get(url)
         response.raise_for_status()
         logger.info(f"Schedule fetched from {url}")
-        return response.json()
+        return cast(dict[str, Any], response.json())
     except httpx.TimeoutException as e:
         logger.error(f"Timeout fetching schedule from {url}: {e}")
         raise ScheduleRetrievalError(f"Request timed out: {url}") from e
@@ -81,7 +82,7 @@ def process_schedule_data(
     observatory_latitude: float,
     observatory_longitude: float,
     observatory_elevation: float,
-) -> Schedule:
+) -> Schedule | None:
     """Process and store schedule data in the database.
 
     Implements the schedule replacement logic:
@@ -105,7 +106,7 @@ def process_schedule_data(
     """
     if len(schedule_data) == 0:
         logger.info(f"No schedule data for {observatory_name} from {source_url}")
-        return
+        return None
 
     # Normalize observatory name to title case for consistency
     # This prevents duplicates like "Rubin" and "rubin"
@@ -136,11 +137,13 @@ def process_schedule_data(
             schedule_start_mjd = Time(
                 min(obs["t_planning"] for obs in schedule_data), format="mjd"
             )
-            schedule_start = schedule_start_mjd.to_datetime(timezone=UTC)
+            schedule_start = cast(
+                datetime, schedule_start_mjd.to_datetime(timezone=UTC)
+            )
             schedule_end_mjd = Time(
                 max(obs["t_planning"] for obs in schedule_data), format="mjd"
             )
-            schedule_end = schedule_end_mjd.to_datetime(timezone=UTC)
+            schedule_end = cast(datetime, schedule_end_mjd.to_datetime(timezone=UTC))
             if schedule is None:
                 schedule = Schedule(
                     observatory_name=normalized_name,

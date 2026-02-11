@@ -9,7 +9,11 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.observation import ObservationStatus
 from app.models.schedule import Schedule
-from app.schemas.schedule import MultipleScheduleResponse, ScheduleResponse
+from app.schemas.schedule import (
+    MultipleScheduleResponse,
+    ObservationResponse,
+    ScheduleResponse,
+)
 
 router = APIRouter(
     prefix="/schedule",
@@ -63,7 +67,9 @@ async def get_full_schedule(
                 schedule_end=schedule.schedule_end,
                 created_at=schedule.created_at,
                 updated_at=schedule.updated_at,
-                observations=filtered_obs,
+                observations=[
+                    ObservationResponse.model_validate(o) for o in filtered_obs
+                ],
             )
         )
 
@@ -130,5 +136,5 @@ async def get_observatory_schedule(
         schedule_end=schedule.schedule_end,
         created_at=schedule.created_at,
         updated_at=schedule.updated_at,
-        observations=filtered_obs,
+        observations=[ObservationResponse.model_validate(o) for o in filtered_obs],
     )

@@ -389,7 +389,7 @@ class TestRetrieveSchedules:
                 db_session,
                 "test_observatory",
                 "https://example.com/schedule",
-                ["not a valid schedule"],
+                {"not": "valid schedule"},
                 0.0,
                 0.0,
                 0.0,
