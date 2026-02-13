@@ -1,17 +1,21 @@
 import os
-from datetime import UTC, datetime, timedelta
 
-import pytest
-from app.database import Base
-from app.models.observation import Observation, ObservationStatus
-from app.models.schedule import Schedule
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
-
+# Use test DB for the app (must set before any app import).
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
     "postgresql://postgres:postgres@localhost:5432/test_fov_notifications",
 )
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+
+from datetime import UTC, datetime, timedelta  # noqa: E402
+
+import pytest  # noqa: E402
+from app.database import Base  # noqa: E402
+from app.models.api_key import APIKey  # noqa: E402
+from app.models.observation import Observation, ObservationStatus  # noqa: E402
+from app.models.schedule import Schedule  # noqa: E402
+from sqlalchemy import create_engine, text  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 
 def _create_database_if_not_exists():
@@ -118,3 +122,14 @@ def create_schedule(db_session):
         return schedule
 
     return _create
+
+
+@pytest.fixture
+def api_key_in_db(db_session):
+    """Insert a known API key into the test DB; return the raw key for the header."""
+    from auth import hash_api_key
+
+    raw = "test-api-key"
+    db_session.add(APIKey(key_hash=hash_api_key(raw), label="test"))
+    db_session.commit()
+    return raw

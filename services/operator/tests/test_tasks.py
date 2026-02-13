@@ -1,7 +1,6 @@
 # ruff: noqa: S101
-
 from datetime import UTC, datetime, timedelta
-from unittest.mock import patch
+from typing import cast
 
 import httpx
 import pytest
@@ -37,12 +36,15 @@ class TestCleanupSchedules:
     """Tests for the cleanup_schedules task."""
 
     @pytest.mark.asyncio
-    async def test_archives_past_observations(self, db_session, create_schedule):
+    async def test_archives_past_observations(
+        self, db_session, create_schedule, mocker
+    ):
         """Test that past observations are moved to ARCHIVED status."""
         create_schedule("test_observatory")
-        # Patch SessionLocal to return the test session
-        with patch("app.tasks.cleanup_schedules.SessionLocal", return_value=db_session):
-            await cleanup_schedules()
+        mocker.patch(
+            "app.tasks.cleanup_schedules.SessionLocal", return_value=db_session
+        )
+        await cleanup_schedules()
 
         # Verify: past observation should be archived
         past_obs = (
@@ -54,11 +56,15 @@ class TestCleanupSchedules:
         assert past_obs.archived_at is not None
 
     @pytest.mark.asyncio
-    async def test_preserves_future_observations(self, db_session, create_schedule):
+    async def test_preserves_future_observations(
+        self, db_session, create_schedule, mocker
+    ):
         """Test that future observations remain in SCHEDULED status."""
         create_schedule("test_observatory")
-        with patch("app.tasks.cleanup_schedules.SessionLocal", return_value=db_session):
-            await cleanup_schedules()
+        mocker.patch(
+            "app.tasks.cleanup_schedules.SessionLocal", return_value=db_session
+        )
+        await cleanup_schedules()
 
         # Verify: future observation should still be scheduled
         future_obs = (
@@ -70,7 +76,7 @@ class TestCleanupSchedules:
         assert future_obs.archived_at is None
 
     @pytest.mark.asyncio
-    async def test_handles_empty_schedule(self, db_session):
+    async def test_handles_empty_schedule(self, db_session, mocker):
         """Test that cleanup handles schedules with no observations gracefully."""
         schedule = Schedule(
             observatory_name="empty_observatory",
@@ -84,16 +90,18 @@ class TestCleanupSchedules:
         db_session.add(schedule)
         db_session.commit()
 
-        with patch("app.tasks.cleanup_schedules.SessionLocal", return_value=db_session):
-            # Should not raise any errors
-            await cleanup_schedules()
+        mocker.patch(
+            "app.tasks.cleanup_schedules.SessionLocal", return_value=db_session
+        )
+        await cleanup_schedules()
 
     @pytest.mark.asyncio
-    async def test_handles_no_schedules(self, db_session):
+    async def test_handles_no_schedules(self, db_session, mocker):
         """Test that cleanup works when there are no schedules at all."""
-        with patch("app.tasks.cleanup_schedules.SessionLocal", return_value=db_session):
-            # Should not raise any errors
-            await cleanup_schedules()
+        mocker.patch(
+            "app.tasks.cleanup_schedules.SessionLocal", return_value=db_session
+        )
+        await cleanup_schedules()
 
 
 class TestRetrieveSchedules:
@@ -133,142 +141,131 @@ class TestRetrieveSchedules:
         ]
 
     @pytest.mark.asyncio
-    async def test_retrieves_schedule(self, db_session, example_schedule_data):
+    async def test_retrieves_schedule(self, db_session, example_schedule_data, mocker):
         """Test that the retrieve_schedules task retrieves the current schedule
         data and stores it in the database, replacing existing future observations."""
-
-        # Patch fetch_schedule_data to return the example schedule data
-        with patch(
+        mocker.patch(
             "app.tasks.retrieve_schedules.fetch_schedule_data",
             return_value=example_schedule_data,
-        ):
-            with patch(
-                "app.tasks.retrieve_schedules.SessionLocal", return_value=db_session
-            ):
-                await retrieve_schedule(
-                    "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
-                )
+        )
+        mocker.patch(
+            "app.tasks.retrieve_schedules.SessionLocal", return_value=db_session
+        )
+        await retrieve_schedule(
+            "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
+        )
 
-            # Verify: future observations should be replaced with the new schedule
-            future_obs = (
-                db_session.query(Observation).order_by(Observation.start_time).all()
-            )
+        # Verify: future observations should be replaced with the new schedule
+        future_obs = (
+            db_session.query(Observation).order_by(Observation.start_time).all()
+        )
 
-            assert len(future_obs) == len(example_schedule_data)
+        assert len(future_obs) == len(example_schedule_data)
 
-            for obs in future_obs:
-                assert obs.status == ObservationStatus.SCHEDULED
-                assert obs.archived_at is None
-                assert obs.target_name in [
-                    obs["target_name"] for obs in example_schedule_data
-                ]
-                assert obs.ra in [obs["s_ra"] for obs in example_schedule_data]
-                assert obs.dec in [obs["s_dec"] for obs in example_schedule_data]
-                assert obs.fov_radius in [obs["s_fov"] for obs in example_schedule_data]
-                assert obs.instrument in [
-                    obs["instrument_name"] for obs in example_schedule_data
-                ]
-                assert obs.start_time in [
-                    Time(obs["t_planning"], format="mjd").to_datetime(timezone=UTC)
-                    for obs in example_schedule_data
-                ]
-                assert obs.end_time in [
-                    Time(
-                        obs["t_planning"] + obs["t_exptime"] / 86400, format="mjd"
-                    ).to_datetime(timezone=UTC)
-                    for obs in example_schedule_data
-                ]
+        for obs in future_obs:
+            assert obs.status == ObservationStatus.SCHEDULED
+            assert obs.archived_at is None
+            assert obs.target_name in [
+                obs["target_name"] for obs in example_schedule_data
+            ]
+            assert obs.ra in [obs["s_ra"] for obs in example_schedule_data]
+            assert obs.dec in [obs["s_dec"] for obs in example_schedule_data]
+            assert obs.fov_radius in [obs["s_fov"] for obs in example_schedule_data]
+            assert obs.instrument in [
+                obs["instrument_name"] for obs in example_schedule_data
+            ]
+            assert obs.start_time in [
+                Time(obs["t_planning"], format="mjd").to_datetime(timezone=UTC)
+                for obs in example_schedule_data
+            ]
+            assert obs.end_time in [
+                Time(
+                    obs["t_planning"] + obs["t_exptime"] / 86400, format="mjd"
+                ).to_datetime(timezone=UTC)
+                for obs in example_schedule_data
+            ]
 
     @pytest.mark.asyncio
     async def test_update_schedule(
-        self, db_session, example_schedule_data, new_schedule_data
+        self, db_session, example_schedule_data, new_schedule_data, mocker
     ):
         """
         Test that the retrieve_schedules task updates the schedule if it already exists.
         """
-
-        # Patch fetch_schedule_data to return the example schedule data
-        with patch(
+        mocker.patch(
             "app.tasks.retrieve_schedules.SessionLocal", return_value=db_session
-        ):
-            with patch(
-                "app.tasks.retrieve_schedules.fetch_schedule_data",
-                return_value=example_schedule_data,
-            ):
-                await retrieve_schedule(
-                    "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
-                )
+        )
+        mocker.patch(
+            "app.tasks.retrieve_schedules.fetch_schedule_data",
+            return_value=example_schedule_data,
+        )
+        await retrieve_schedule(
+            "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
+        )
 
-                future_obs = (
-                    db_session.query(Observation).order_by(Observation.start_time).all()
-                )
+        future_obs = (
+            db_session.query(Observation).order_by(Observation.start_time).all()
+        )
+        assert len(future_obs) == len(example_schedule_data)
 
-                assert len(future_obs) == len(example_schedule_data)
+        mocker.patch(
+            "app.tasks.retrieve_schedules.fetch_schedule_data",
+            return_value=new_schedule_data,
+        )
+        await retrieve_schedule(
+            "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
+        )
 
-            with patch(
-                "app.tasks.retrieve_schedules.fetch_schedule_data",
-                return_value=new_schedule_data,
-            ):
-                await retrieve_schedule(
-                    "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
-                )
+        future_obs = (
+            db_session.query(Observation).order_by(Observation.start_time).all()
+        )
+        assert len(future_obs) == len(new_schedule_data)
 
-                future_obs = (
-                    db_session.query(Observation).order_by(Observation.start_time).all()
-                )
-
-                assert len(future_obs) == len(new_schedule_data)
-
-                for obs in future_obs:
-                    assert obs.status == ObservationStatus.SCHEDULED
-                    assert obs.archived_at is None
-                    assert obs.target_name in [
-                        obs["target_name"] for obs in new_schedule_data
-                    ]
-                    assert obs.ra in [obs["s_ra"] for obs in new_schedule_data]
-                    assert obs.dec in [obs["s_dec"] for obs in new_schedule_data]
-                    assert obs.fov_radius in [obs["s_fov"] for obs in new_schedule_data]
+        for obs in future_obs:
+            assert obs.status == ObservationStatus.SCHEDULED
+            assert obs.archived_at is None
+            assert obs.target_name in [obs["target_name"] for obs in new_schedule_data]
+            assert obs.ra in [obs["s_ra"] for obs in new_schedule_data]
+            assert obs.dec in [obs["s_dec"] for obs in new_schedule_data]
+            assert obs.fov_radius in [obs["s_fov"] for obs in new_schedule_data]
 
     @pytest.mark.asyncio
-    async def test_retrieves_schedule_errors(self, db_session):
+    async def test_retrieves_schedule_errors(self, db_session, mocker):
         """
         Test that fetch_schedule_data raises ScheduleRetrievalError and
         retrieve_schedule handles it correctly.
         """
-        # Test that fetch_schedule_data raises the error
-        with patch("app.tasks.retrieve_schedules.get_http_client") as mock_get_client:
-            mock_client = mock_get_client.return_value
-            mock_client.get.side_effect = httpx.TimeoutException("Connection timed out")
+        mock_get_client = mocker.patch("app.tasks.retrieve_schedules.get_http_client")
+        mock_client = mock_get_client.return_value
+        mock_client.get.side_effect = httpx.TimeoutException("Connection timed out")
 
-            with pytest.raises(ScheduleRetrievalError, match="Request timed out"):
-                await fetch_schedule_data("https://example.com/schedule")
+        with pytest.raises(ScheduleRetrievalError, match="Request timed out"):
+            await fetch_schedule_data("https://example.com/schedule")
 
-        # Test that retrieve_schedule catches the error
-        with patch(
+        mocker.patch(
             "app.tasks.retrieve_schedules.SessionLocal", return_value=db_session
-        ):
-            with patch(
-                "app.tasks.retrieve_schedules.fetch_schedule_data",
-                side_effect=ScheduleRetrievalError("Request timed out"),
-            ):
-                # Should not raise - error is caught and logged
-                await retrieve_schedule(
-                    "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
-                )
+        )
+        mocker.patch(
+            "app.tasks.retrieve_schedules.fetch_schedule_data",
+            side_effect=ScheduleRetrievalError("Request timed out"),
+        )
+        await retrieve_schedule(
+            "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
+        )
 
     @pytest.mark.asyncio
-    async def test_retrieve_empty_schedule(self, db_session, create_schedule):
+    async def test_retrieve_empty_schedule(self, db_session, create_schedule, mocker):
         """Test that an empty schedule does not delete any observations."""
         create_schedule("test_observatory")
-        with patch(
+        mocker.patch(
             "app.tasks.retrieve_schedules.SessionLocal", return_value=db_session
-        ):
-            with patch(
-                "app.tasks.retrieve_schedules.fetch_schedule_data", return_value=[]
-            ):
-                await retrieve_schedule(
-                    "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
-                )
+        )
+        mocker.patch(
+            "app.tasks.retrieve_schedules.fetch_schedule_data", return_value=[]
+        )
+        await retrieve_schedule(
+            "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
+        )
 
         # Fixture creates 2 observations: "Past Target" and "Future Target"
         obs = db_session.query(Observation).all()
@@ -277,20 +274,20 @@ class TestRetrieveSchedules:
 
     @pytest.mark.asyncio
     async def test_retrieve_schedule_archived_obs(
-        self, db_session, create_schedule, new_schedule_data
+        self, db_session, create_schedule, new_schedule_data, mocker
     ):
         """Test that archived obs are not deleted and future obs are replaced."""
         create_schedule("test_observatory")
-        with patch(
+        mocker.patch(
             "app.tasks.retrieve_schedules.SessionLocal", return_value=db_session
-        ):
-            with patch(
-                "app.tasks.retrieve_schedules.fetch_schedule_data",
-                return_value=new_schedule_data,
-            ):
-                await retrieve_schedule(
-                    "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
-                )
+        )
+        mocker.patch(
+            "app.tasks.retrieve_schedules.fetch_schedule_data",
+            return_value=new_schedule_data,
+        )
+        await retrieve_schedule(
+            "test_observatory", "https://example.com/schedule", 0.0, 0.0, 0.0
+        )
 
         obs = db_session.query(Observation).all()
         assert len(obs) == 2
@@ -300,79 +297,90 @@ class TestRetrieveSchedules:
 
     @pytest.mark.asyncio
     async def test_retrieve_schedule_new_obs(
-        self, db_session, create_schedule, new_schedule_data
+        self, db_session, create_schedule, new_schedule_data, mocker
     ):
         """Test that a new schedule object is created if it does not exist, and that
         future observations are associate with the correct schedule."""
         create_schedule("Test_Observatory")
-        with patch(
+        mocker.patch(
             "app.tasks.retrieve_schedules.SessionLocal", return_value=db_session
-        ):
-            with patch(
-                "app.tasks.retrieve_schedules.fetch_schedule_data",
-                return_value=new_schedule_data,
-            ):
-                await retrieve_schedule(
-                    "test_new_observatory",
-                    "https://example.com/schedule",
-                    200.0,
-                    20.0,
-                    2000.0,
-                )
+        )
+        mocker.patch(
+            "app.tasks.retrieve_schedules.fetch_schedule_data",
+            return_value=new_schedule_data,
+        )
+        await retrieve_schedule(
+            "test_new_observatory",
+            "https://example.com/schedule",
+            200.0,
+            20.0,
+            2000.0,
+        )
 
-                # Check that a new schedule object is created and has only the new
-                # observations
-                schedules = db_session.query(Schedule).all()
-                assert len(schedules) == 2
-                assert {s.observatory_name for s in schedules} == {
-                    "Test_New_Observatory",
-                    "Test_Observatory",
+        # Check that a new schedule object is created and has only the new
+        # observations
+        schedules = db_session.query(Schedule).all()
+        assert len(schedules) == 2
+        assert {s.observatory_name for s in schedules} == {
+            "Test_New_Observatory",
+            "Test_Observatory",
+        }
+
+        for schedule in schedules:
+            if schedule.observatory_name == "Test_New_Observatory":
+                # Check that the observatory location is set correctly
+                assert schedule.observatory_latitude == 200.0
+                assert schedule.observatory_longitude == 20.0
+                assert schedule.observatory_elevation == 2000.0
+
+                assert len(schedule.observations) == len(new_schedule_data)
+                assert {o.target_name for o in schedule.observations} == {
+                    obs["target_name"] for obs in new_schedule_data
                 }
-
-                for schedule in schedules:
-                    if schedule.observatory_name == "Test_New_Observatory":
-                        # Check that the observatory location is set correctly
-                        assert schedule.observatory_latitude == 200.0
-                        assert schedule.observatory_longitude == 20.0
-                        assert schedule.observatory_elevation == 2000.0
-
-                        assert len(schedule.observations) == len(new_schedule_data)
-                        assert {o.target_name for o in schedule.observations} == {
-                            obs["target_name"] for obs in new_schedule_data
-                        }
-                        assert {o.ra for o in schedule.observations} == {
-                            obs["s_ra"] for obs in new_schedule_data
-                        }
-                        assert {o.dec for o in schedule.observations} == {
-                            obs["s_dec"] for obs in new_schedule_data
-                        }
-                        assert {o.fov_radius for o in schedule.observations} == {
-                            obs["s_fov"] for obs in new_schedule_data
-                        }
-                        assert {o.instrument for o in schedule.observations} == {
-                            obs["instrument_name"] for obs in new_schedule_data
-                        }
-                        assert {o.start_time for o in schedule.observations} == {
-                            Time(obs["t_planning"], format="mjd").to_datetime(
-                                timezone=UTC
-                            )
-                            for obs in new_schedule_data
-                        }
-                        assert {o.end_time for o in schedule.observations} == {
-                            Time(
-                                obs["t_planning"] + obs["t_exptime"] / 86400,
-                                format="mjd",
-                            ).to_datetime(timezone=UTC)
-                            for obs in new_schedule_data
-                        }
-                    else:
-                        # There are only two schedules so the other one is the
-                        # test schedule
-                        assert len(schedule.observations) == 2
-                        assert {o.target_name for o in schedule.observations} == {
-                            "Past Target",
-                            "Future Target",
-                        }
+                assert {o.ra for o in schedule.observations} == {
+                    obs["s_ra"] for obs in new_schedule_data
+                }
+                assert {o.dec for o in schedule.observations} == {
+                    obs["s_dec"] for obs in new_schedule_data
+                }
+                assert {o.fov_radius for o in schedule.observations} == {
+                    obs["s_fov"] for obs in new_schedule_data
+                }
+                assert {o.instrument for o in schedule.observations} == {
+                    obs["instrument_name"] for obs in new_schedule_data
+                }
+                expected_starts = sorted(
+                    cast(
+                        datetime,
+                        Time(obs["t_planning"], format="mjd").to_datetime(timezone=UTC),
+                    )
+                    for obs in new_schedule_data
+                )
+                assert (
+                    sorted(o.start_time for o in schedule.observations)
+                    == expected_starts
+                )
+                expected_ends = sorted(
+                    cast(
+                        datetime,
+                        Time(
+                            obs["t_planning"] + obs["t_exptime"] / 86400,
+                            format="mjd",
+                        ).to_datetime(timezone=UTC),
+                    )
+                    for obs in new_schedule_data
+                )
+                assert (
+                    sorted(o.end_time for o in schedule.observations) == expected_ends
+                )
+            else:
+                # There are only two schedules so the other one is the
+                # test schedule
+                assert len(schedule.observations) == 2
+                assert {o.target_name for o in schedule.observations} == {
+                    "Past Target",
+                    "Future Target",
+                }
 
     @pytest.mark.asyncio
     async def test_retrieve_schedule_bad_data(self, db_session):
