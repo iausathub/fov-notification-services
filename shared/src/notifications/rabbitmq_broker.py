@@ -4,8 +4,8 @@ import os
 from typing import Any
 
 import aio_pika
-from aio_pika import Exchange, Message
-from aio_pika.abc import AbstractChannel, AbstractConnection
+from aio_pika import Message
+from aio_pika.abc import AbstractChannel, AbstractConnection, AbstractExchange
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class RabbitMQBroker:
         )
         self._connection: AbstractConnection | None = None
         self._channel: AbstractChannel | None = None
-        self._exchange: Exchange | None = None
+        self._exchange: AbstractExchange | None = None
 
     async def connect(self) -> None:
         """Establish connection to RabbitMQ and set up exchange."""

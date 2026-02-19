@@ -36,8 +36,8 @@ services:
   # FastAPI Backend
   api:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/operator/Dockerfile
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/fov_notifications
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
@@ -49,15 +49,15 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  # React Frontend
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:80"
-    depends_on:
-      - api
+  # React Frontend - TODO
+  #frontend:
+  #  build:
+  #    context: ./frontend
+  #    dockerfile: Dockerfile
+  #  ports:
+  #    - "3000:80"
+  #  depends_on:
+  #    - api
 
 volumes:
   postgres_data:
