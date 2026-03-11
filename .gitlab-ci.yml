@@ -1,0 +1,57 @@
+stages:
+  - build
+  - push
+
+Prd API Build:
+  extends: .build_image
+  stage: build
+  variables:
+    REGISTRY_SUBPATH: "attitudechecker-prd"
+    CONTAINERFILE: "Dockerfile"
+    CONTAINER_CONTEXT: "services/operator"
+    ENVIRONMENT: "prd"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - "services/**/*"
+
+Prd API Push Tag:
+  extends: .push_tag
+  stage: push
+  variables:
+    APP_NAME: "cps-attitudechecker-prd"
+  dependencies:
+    - Prd API Build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - "services/**/*"
+
+Dev API Build:
+  extends: .build_image
+  stage: build
+  variables:
+    REGISTRY_SUBPATH: "attitudechecker-dev"
+    CONTAINERFILE: "Dockerfile"
+    CONTAINER_CONTEXT: "services/operator"
+    ENVIRONMENT: "dev"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "develop"
+      changes:
+        paths:
+          - "services/**/*"
+
+Dev API Push Tag:
+  extends: .push_tag
+  stage: push
+  variables:
+    APP_NAME: "cps-attitudechecker-dev"
+  dependencies:
+    - Dev API Build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "develop"
+      changes:
+        paths:
+          - "services/**/*"
