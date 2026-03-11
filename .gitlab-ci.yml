@@ -2,6 +2,17 @@ stages:
   - build
   - push
 
+# workflow:
+#   rules:
+#     - if: '$CI_PIPELINE_SOURCE == "external_pull_request_event"'
+
+include:
+  - project: "noirlab/ci-cd-common"
+    file:
+      # Can't build multi-arch. psutil is not available for arm64.
+      - "jobs/build-container-image.tpl.yml"
+      - "jobs/k8s-update-tag.tpl.yml"
+
 Prd API Build:
   extends: .build_image
   stage: build
