@@ -1,0 +1,14 @@
+# Only shared/ and services/operator/ in context (paths relative to repo root)
+services/*
+!services/operator
+
+# Reduce context size
+.git
+**/__pycache__
+**/.venv
+**/node_modules
+**/.ruff_cache
+**/.mypy_cache
+**/.pytest_cache
+**/.coverage
+*.pyc
