@@ -1,7 +1,9 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
+import numpy as np
 from fastapi import APIRouter, Depends, Query
+from healpy import pixelfunc
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -10,6 +12,8 @@ from app.dependencies import get_current_user
 from app.models.observation import ObservationStatus
 from app.models.schedule import Schedule
 from app.schemas.schedule import (
+    HealpixScheduleResponse,
+    MultipleHealpixScheduleResponse,
     MultipleScheduleResponse,
     ObservationResponse,
     ScheduleResponse,
@@ -74,6 +78,66 @@ async def get_full_schedule(
         )
 
     return MultipleScheduleResponse(schedules=result)
+
+
+@router.get("/healpix", response_model=MultipleHealpixScheduleResponse)
+async def get_full_healpix_schedule(
+    db: Annotated[Session, Depends(get_db)],
+    hours: int = Query(
+        24, ge=1, le=48, description="Hours ahead to include (max 2 days)"
+    ),
+):
+
+    now = datetime.now(UTC)
+    end_time = now + timedelta(hours=hours)
+
+    # Get all schedules with their observations filtered by time window
+    schedules = db.query(Schedule).all()
+
+    result = []
+    nside = 16
+    use_nested = True
+    for schedule in schedules:
+        # Filter observations to the time window
+        filtered_obs = [
+            obs
+            for obs in schedule.observations
+            if obs.status == ObservationStatus.SCHEDULED
+            and obs.start_time >= now
+            and obs.start_time <= end_time
+        ]
+        # Sort by start time
+        filtered_obs.sort(key=lambda o: o.start_time)
+
+        if filtered_obs:
+
+            # Get the unique HEALPix indices for all observations
+            # in the schedule
+            ras = np.array([obs.ra for obs in filtered_obs])
+            decs = np.array([obs.dec for obs in filtered_obs])
+            healpix_indices = list(
+                set(pixelfunc.ang2pix(nside, ras, decs, lonlat=True, nest=use_nested))
+            )
+        else:
+            healpix_indices = []
+
+        result.append(
+            HealpixScheduleResponse(
+                observatory_name=schedule.observatory_name,
+                observatory_latitude=schedule.observatory_latitude,
+                observatory_longitude=schedule.observatory_longitude,
+                observatory_elevation=schedule.observatory_elevation,
+                schedule_start=schedule.schedule_start,
+                schedule_end=schedule.schedule_end,
+                created_at=schedule.created_at,
+                updated_at=schedule.updated_at,
+                n_side=nside,
+                ordering="nested" if use_nested else "ring",
+                pixel_indices=healpix_indices,
+            )
+        )
+
+    return MultipleHealpixScheduleResponse(schedules=result)
 
 
 @router.get("/{observatory_name}", response_model=ScheduleResponse)
