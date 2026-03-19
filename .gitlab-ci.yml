@@ -1,0 +1,68 @@
+stages:
+  - build
+  - push
+
+# workflow:
+#   rules:
+#     - if: '$CI_PIPELINE_SOURCE == "external_pull_request_event"'
+
+include:
+  - project: "noirlab/ci-cd-common"
+    file:
+      # Can't build multi-arch. psutil is not available for arm64.
+      - "jobs/build-container-image.tpl.yml"
+      - "jobs/k8s-update-tag.tpl.yml"
+
+Prd API Build:
+  extends: .build_image
+  stage: build
+  variables:
+    REGISTRY_SUBPATH: "attitudechecker-prd"
+    CONTAINERFILE: "services/operator/Dockerfile"
+    CONTAINER_CONTEXT: "."
+    ENVIRONMENT: "prd"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - "services/operator/**/*"
+
+Prd API Push Tag:
+  extends: .push_tag
+  stage: push
+  variables:
+    APP_NAME: "cps-attitudechecker-prd"
+  dependencies:
+    - Prd API Build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        paths:
+          - "services/operator/**/*"
+
+Dev API Build:
+  extends: .build_image
+  stage: build
+  variables:
+    REGISTRY_SUBPATH: "attitudechecker-dev"
+    CONTAINERFILE: "services/operator/Dockerfile"
+    CONTAINER_CONTEXT: "."
+    ENVIRONMENT: "dev"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "develop"
+      changes:
+        paths:
+          - "services/operator/**/*"
+
+Dev API Push Tag:
+  extends: .push_tag
+  stage: push
+  variables:
+    APP_NAME: "cps-attitudechecker-dev"
+  dependencies:
+    - Dev API Build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "develop"
+      changes:
+        paths:
+          - "services/operator/**/*"
