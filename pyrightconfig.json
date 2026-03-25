@@ -1,3 +1,4 @@
 {
-  "extraPaths": ["shared/src"]
+  "extraPaths": ["shared/src"],
+  "ignore": ["services/operator/scripts/**"]
 }

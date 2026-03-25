@@ -85,7 +85,8 @@ class TestScheduleRoutes:
     def test_get_schedule_with_hours_filter(self, client, create_schedule):
         """Test filtering observations by hours parameter."""
         create_schedule("test_observatory")
-        # Request next 6 hours - should get the observation (future obs is 1 hour ahead)
+        # Request next 6 hours - should get the observation
+        # (future obs is 4 hours ahead)
         response = client.get("/schedule/test_observatory?hours=6")
         assert response.status_code == 200
         data = response.json()
@@ -94,3 +95,53 @@ class TestScheduleRoutes:
         # Verify hours parameter is accepted
         response = client.get("/schedule/test_observatory?hours=1")
         assert response.status_code == 200
+
+        # Request next 3 hours - should not get any observations
+        response = client.get("/schedule/test_observatory?hours=3")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["observations"]) == 0
+
+    def test_get_healpix_schedule(self, client, create_schedule):
+        """Test getting HEALPix schedule for all observatories."""
+        create_schedule("Observatory_A")
+        create_schedule("Observatory_B")
+
+        response = client.get("/schedule/healpix")
+        assert response.status_code == 200
+        data = response.json()
+        assert "schedules" in data
+        assert len(data["schedules"]) == 2
+        names = {s["observatory_name"] for s in data["schedules"]}
+        assert names == {"Observatory_A", "Observatory_B"}
+
+        # Each schedule should only include scheduled (not archived) observations
+        for schedule in data["schedules"]:
+            assert len(schedule["pixel_indices"]) == 1
+            assert schedule["n_side"] == 16
+            assert schedule["ordering"] == "nested"
+
+    def test_get_healpix_observatory_schedule(self, client, create_schedule):
+        """Test getting HEALPix schedule for a specific observatory."""
+        create_schedule("test_observatory")
+        response = client.get("/schedule/test_observatory/healpix")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["observatory_name"] == "test_observatory"
+        assert "pixel_indices" in data
+        assert len(data["pixel_indices"]) == 1
+        assert data["n_side"] == 16
+        assert data["ordering"] == "nested"
+
+    def test_get_healpix_rubin_schedule(self, client, create_schedule):
+        """Test getting HEALPix schedule for a specific observatory."""
+        create_schedule("rubin")
+        response = client.get("/schedule/rubin/healpix")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["observatory_name"] == "rubin"
+        assert "pixel_indices" in data
+        assert len(data["pixel_indices"]) == 24
+        assert data["n_side"] == 32
