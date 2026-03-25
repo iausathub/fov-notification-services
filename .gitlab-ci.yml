@@ -18,8 +18,8 @@ Prd API Build:
   stage: build
   variables:
     REGISTRY_SUBPATH: "attitudechecker-prd"
-    CONTAINERFILE: "Dockerfile"
-    CONTAINER_CONTEXT: "services/operator"
+    CONTAINERFILE: "services/operator/Dockerfile"
+    # CONTAINER_CONTEXT: "services/operator"
     ENVIRONMENT: "prd"
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -45,8 +45,8 @@ Dev API Build:
   stage: build
   variables:
     REGISTRY_SUBPATH: "attitudechecker-dev"
-    CONTAINERFILE: "Dockerfile"
-    CONTAINER_CONTEXT: "services/operator"
+    CONTAINERFILE: "services/operator/Dockerfile"
+    # CONTAINER_CONTEXT: "services/operator"
     ENVIRONMENT: "dev"
   rules:
     - if: $CI_COMMIT_BRANCH == "develop"
