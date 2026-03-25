@@ -153,10 +153,12 @@ async def get_full_healpix_schedule(
         # Sort by start time
         filtered_obs.sort(key=lambda o: o.start_time)
 
+        radius = None
         if schedule.observatory_name.lower() == "rubin":
             healpix_indices, nside, use_nested = _get_healpix_indices_rubin(
                 filtered_obs
             )
+            radius = 5
         else:
             healpix_indices, nside, use_nested = _get_healpix_indices(filtered_obs)
 
@@ -173,6 +175,7 @@ async def get_full_healpix_schedule(
                 n_side=nside,
                 ordering="nested" if use_nested else "ring",
                 pixel_indices=healpix_indices,
+                radius=radius,
             )
         )
 
@@ -294,8 +297,10 @@ async def get_healpix_observatory_schedule(
 
     filtered_obs.sort(key=lambda o: o.start_time)
 
+    radius = None
     if schedule.observatory_name.lower() == "rubin":
         healpix_indices, nside, use_nested = _get_healpix_indices_rubin(filtered_obs)
+        radius = 5
     else:
         healpix_indices, nside, use_nested = _get_healpix_indices(filtered_obs)
 
@@ -311,4 +316,5 @@ async def get_healpix_observatory_schedule(
         n_side=nside,
         ordering="nested" if use_nested else "ring",
         pixel_indices=healpix_indices,
+        radius=radius,
     )

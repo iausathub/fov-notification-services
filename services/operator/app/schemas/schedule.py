@@ -58,6 +58,7 @@ class HealpixScheduleResponse(BaseModel):
     n_side: int
     ordering: str
     pixel_indices: list[int]
+    radius: int | None
 
 
 class MultipleHealpixScheduleResponse(BaseModel):
