@@ -1,5 +1,5 @@
 [project]
-name = "fov-notification-service"
+name = "AttitudeChecker"
 version = "0.1.0"
 description = "Notification service for observation schedules and satellite FOV interference"
 readme = "README.md"
@@ -15,9 +15,13 @@ dependencies = [
     "psycopg2-binary>=2.9.11",
     "sqlalchemy>=2.0.45",
     "websockets>=16.0",
+    "healpy>=1.19.0",
 ]
 
 [dependency-groups]
+scripts = [
+    "matplotlib>=3.9.0",
+]
 dev = [
     "black>=26.1.0",
     "pre-commit>=4.5.0",
@@ -34,6 +38,7 @@ shared = { path = "../../shared", editable = true }
 
 [tool.pyright]
 extraPaths = ["../../shared/src"]
+ignore = ["scripts/**"]
 
 [tool.mypy]
 mypy_path = "../../shared/src"
@@ -58,6 +63,10 @@ module = [
     "apscheduler.schedulers.asyncio",
     "apscheduler.triggers.interval",
 ]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["matplotlib", "matplotlib.*", "healpy"]
 ignore_missing_imports = true
 
 [tool.ruff]

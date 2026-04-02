@@ -40,3 +40,30 @@ class MultipleScheduleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     schedules: list[ScheduleResponse]
+
+
+class HealpixScheduleResponse(BaseModel):
+    """Healpix schedule response schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    observatory_name: str
+    observatory_latitude: float
+    observatory_longitude: float
+    observatory_elevation: float
+    schedule_start: datetime
+    schedule_end: datetime
+    created_at: datetime
+    updated_at: datetime | None
+    n_side: int
+    ordering: str
+    pixel_indices: list[int]
+    radius: int | None
+
+
+class MultipleHealpixScheduleResponse(BaseModel):
+    """Multiple schedule response schema with HEALPix schedules."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    schedules: list[HealpixScheduleResponse]

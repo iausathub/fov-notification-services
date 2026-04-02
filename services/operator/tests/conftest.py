@@ -111,8 +111,8 @@ def create_schedule(db_session):
             target_name="Future Target",
             ra=90.0,
             dec=-30.0,
-            start_time=now + timedelta(hours=1),
-            end_time=now + timedelta(hours=2),
+            start_time=now + timedelta(hours=4),
+            end_time=now + timedelta(hours=5),
             fov_radius=1.5,
         )
 
