@@ -28,9 +28,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="FOV Notification Service",
+    title="AttitudeChecker",
     description="Notification service for observation schedules \
-        and satellite FOV interference",
+        to reduce satellite interference",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -46,13 +46,13 @@ async def root():
     """Root endpoint."""
     # TODO: Add real URL for documentation
     return {
-        "name": "FOV Notification Service",
+        "name": "AttitudeChecker",
         "version": "0.1.0",
         "description": (
             "Notification service for observation schedules "
-            "and satellite FOV interference"
+            "to reduce satellite interference"
         ),
-        "documentation": "http://127.0.0.1:8000/docs",
+        "documentation": "https://attitudechecker.cps.iau.org/docs",
     }
 
 
