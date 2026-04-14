@@ -24,7 +24,7 @@ def get_http_client() -> httpx.AsyncClient:
     global _http_client
     if _http_client is None:
         _http_client = httpx.AsyncClient(
-            timeout=30.0,
+            timeout=120.0,
             follow_redirects=True,
         )
     return _http_client
