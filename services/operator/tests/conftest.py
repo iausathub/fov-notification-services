@@ -36,6 +36,15 @@ def _create_database_if_not_exists():
     engine.dispose()
 
 
+@pytest.fixture(autouse=True)
+def run_task_db_work_inline(mocker):
+    async def inline(fn, /, *args, **kwargs):
+        return fn(*args, **kwargs)
+
+    mocker.patch("app.tasks.retrieve_schedules.asyncio.to_thread", new=inline)
+    mocker.patch("app.tasks.cleanup_schedules.asyncio.to_thread", new=inline)
+
+
 @pytest.fixture(scope="session")
 def db_engine():
     """

@@ -15,13 +15,16 @@ from app.tasks.retrieve_schedules import (
 )
 from astropy.time import Time
 
+# Make sure observations are always future for tests.
+_FUTURE_MJD_BASE = 62000.0
+
 
 @pytest.fixture
 def new_schedule_data():
     """Example new schedule data (format from the Rubin schedule API)"""
     return [
         {
-            "t_planning": 61019.35632748149,
+            "t_planning": _FUTURE_MJD_BASE + 0.02,
             "target_name": "ddf_edfs_b, lowdust",
             "s_ra": 123,
             "s_dec": 30,
@@ -110,9 +113,10 @@ class TestRetrieveSchedules:
     @pytest.fixture
     def example_schedule_data(self):
         """Example schedule data for testing. (format from the Rubin schedule API)"""
+        b = _FUTURE_MJD_BASE
         return [
             {
-                "t_planning": 61019.35632748149,
+                "t_planning": b,
                 "target_name": "ddf_edfs_b, lowdust",
                 "s_ra": 65.77732051949559,
                 "s_dec": -46.70068946263419,
@@ -121,7 +125,7 @@ class TestRetrieveSchedules:
                 "instrument_name": "LSSTCam",
             },
             {
-                "t_planning": 61019.35600404545,
+                "t_planning": b - 0.00032343604,
                 "target_name": "lowdust",
                 "s_ra": 61.78003509187598,
                 "s_dec": -41.55606824815095,
@@ -130,7 +134,7 @@ class TestRetrieveSchedules:
                 "instrument_name": "LSSTCam",
             },
             {
-                "t_planning": 61019.35588171854,
+                "t_planning": b - 0.00044576295,
                 "target_name": "lowdust",
                 "s_ra": 68.01621252389484,
                 "s_dec": -49.24758246665158,

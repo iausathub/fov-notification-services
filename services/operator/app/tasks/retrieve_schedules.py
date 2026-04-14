@@ -1,5 +1,6 @@
 """APScheduler task to retrieve observation schedules from external sources."""
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -26,6 +27,7 @@ def get_http_client() -> httpx.AsyncClient:
         _http_client = httpx.AsyncClient(
             timeout=120.0,
             follow_redirects=True,
+            trust_env=False,
         )
     return _http_client
 
@@ -78,7 +80,7 @@ def process_schedule_data(
     db: Session,
     observatory_name: str,
     source_url: str,
-    schedule_data: dict,
+    schedule_data: list | dict,
     observatory_latitude: float,
     observatory_longitude: float,
     observatory_elevation: float,
@@ -172,20 +174,32 @@ def process_schedule_data(
         # Flush to get schedule.id for new observations
         db.flush()
 
-        # Create new SCHEDULED observations for the new schedule
+        now_utc = datetime.now(UTC)
         for obs_data in schedule_data:
-            start_time = Time(obs_data.get("t_planning"), format="mjd").to_datetime(
-                timezone=UTC
+            start_time = cast(
+                datetime,
+                Time(obs_data.get("t_planning"), format="mjd").to_datetime(
+                    timezone=UTC
+                ),
             )
             # convert t_exptime from seconds to days
             t_exptime_days = obs_data.get("t_exptime") / 86400
-            end_time = Time(
-                obs_data.get("t_planning") + t_exptime_days, format="mjd"
-            ).to_datetime(timezone=UTC)
+            end_time = cast(
+                datetime,
+                Time(
+                    obs_data.get("t_planning") + t_exptime_days, format="mjd"
+                ).to_datetime(timezone=UTC),
+            )
+            already_past = start_time < now_utc
             observation = Observation(
                 schedule_id=schedule.id,
                 observatory_name=normalized_name,
-                status=ObservationStatus.SCHEDULED,
+                status=(
+                    ObservationStatus.ARCHIVED
+                    if already_past
+                    else ObservationStatus.SCHEDULED
+                ),
+                archived_at=now_utc if already_past else None,
                 target_name=obs_data.get("target_name"),
                 ra=obs_data.get("s_ra"),
                 dec=obs_data.get("s_dec"),
@@ -200,6 +214,57 @@ def process_schedule_data(
     db.commit()
     logger.info(f"Updated schedule for {normalized_name} from {source_url}")
     return schedule
+
+
+def _persist_retrieved_schedule(
+    observatory_name: str,
+    url: str,
+    schedule_data: list | dict,
+    observatory_latitude: float,
+    observatory_longitude: float,
+    observatory_elevation: float,
+) -> dict | None:
+    """Update the database with the retrieved schedule data."""
+    db = SessionLocal()
+    try:
+        schedule = process_schedule_data(
+            db,
+            observatory_name,
+            url,
+            schedule_data,
+            observatory_latitude,
+            observatory_longitude,
+            observatory_elevation,
+        )
+        if not schedule:
+            return None
+        return {
+            "id": schedule.id,
+            "observatory_name": schedule.observatory_name,
+            "schedule_start": (
+                schedule.schedule_start.isoformat() if schedule.schedule_start else None
+            ),
+            "schedule_end": (
+                schedule.schedule_end.isoformat() if schedule.schedule_end else None
+            ),
+            "updated_at": (
+                schedule.updated_at.isoformat() if schedule.updated_at else None
+            ),
+            "observation_count": len(schedule_data),
+        }
+    except ScheduleRetrievalError:
+        raise
+    finally:
+        db.close()
+
+
+async def notify_schedule_update(
+    observatory_name: str, schedule_dict: dict[str, Any]
+) -> None:
+    """Publish a schedule-updated event to RabbitMQ"""
+
+    # TODO: Implement notification
+    pass
 
 
 async def retrieve_schedule(
@@ -228,11 +293,9 @@ async def retrieve_schedule(
         # Error already logged, just return
         return
 
-    db = SessionLocal()
-    schedule_dict = None
     try:
-        schedule = process_schedule_data(
-            db,
+        schedule_dict = await asyncio.to_thread(
+            _persist_retrieved_schedule,
             observatory_name,
             url,
             schedule_data,
@@ -240,41 +303,14 @@ async def retrieve_schedule(
             observatory_longitude,
             observatory_elevation,
         )
-
-        # Publish notification to RabbitMQ if schedule was updated
-        if schedule:
-            schedule_dict = {
-                "id": schedule.id,
-                "observatory_name": schedule.observatory_name,
-                "schedule_start": (
-                    schedule.schedule_start.isoformat()
-                    if schedule.schedule_start
-                    else None
-                ),
-                "schedule_end": (
-                    schedule.schedule_end.isoformat() if schedule.schedule_end else None
-                ),
-                "updated_at": (
-                    schedule.updated_at.isoformat() if schedule.updated_at else None
-                ),
-                "observation_count": len(schedule_data),
-                # TODO: Add actual observation data
-            }
-
     except ScheduleRetrievalError:
         # Re-raise so APScheduler event listener sees the error
         raise
-    finally:
-        db.close()
 
-    # Publish notification to RabbitMQ after DB session is closed
     if schedule_dict:
-        # TODO: Implement notification
-        pass
-        """
         try:
             await notify_schedule_update(observatory_name, schedule_dict)
         except Exception as e:
-            # Log but don't fail the schedule retrieval if notification fails
-            logger.error(f"Failed to publish schedule update notification: {e}")
-        """
+            logger.error(
+                "Failed to publish schedule update notification: %s", e, exc_info=True
+            )
