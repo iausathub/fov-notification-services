@@ -1,10 +1,13 @@
 import asyncio
 import logging
 from datetime import UTC, datetime
+from typing import Any, cast
+
+from sqlalchemy import update
+from sqlalchemy.engine import CursorResult
 
 from app.database import SessionLocal
-from app.models.observation import ObservationStatus
-from app.models.schedule import Schedule
+from app.models.observation import Observation, ObservationStatus
 
 logger = logging.getLogger(__name__)
 
@@ -13,15 +16,18 @@ def _cleanup_schedules_sync() -> None:
     db = SessionLocal()
     try:
         now_utc = datetime.now(UTC)
-        archived_observations = 0
-        for schedule in db.query(Schedule).all():
-            for observation in schedule.observations:
-                if observation.start_time < now_utc:
-                    observation.status = ObservationStatus.ARCHIVED
-                    observation.archived_at = now_utc
-                    archived_observations += 1
+
+        result = cast(
+            CursorResult[Any],
+            db.execute(
+                update(Observation)
+                .where(Observation.start_time < now_utc)
+                .values(status=ObservationStatus.ARCHIVED, archived_at=now_utc)
+            ),
+        )
         db.commit()
-        logger.info(f"Moved {archived_observations} observations to ARCHIVED status")
+        archived = result.rowcount if result.rowcount is not None else 0
+        logger.info("Moved %s observations to ARCHIVED status", archived)
     finally:
         db.close()
 
