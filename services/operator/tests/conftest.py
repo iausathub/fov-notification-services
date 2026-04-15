@@ -85,7 +85,7 @@ def db_session(db_engine):
 def create_schedule(db_session):
     """Factory fixture to create schedules with custom observatory names."""
 
-    def _create(observatory_name="Test_Observatory"):
+    def _create(observatory_name="Test_Observatory", *, past_obs_still_scheduled=False):
         now = datetime.now(UTC)
         schedule = Schedule(
             observatory_name=observatory_name,
@@ -99,11 +99,15 @@ def create_schedule(db_session):
         db_session.add(schedule)
         db_session.flush()
 
-        # Past observation (archived)
+        # Past observation: ARCHIVED by default (survives schedule refresh)
         past_obs = Observation(
             schedule_id=schedule.id,
             observatory_name=observatory_name,
-            status=ObservationStatus.ARCHIVED,
+            status=(
+                ObservationStatus.SCHEDULED
+                if past_obs_still_scheduled
+                else ObservationStatus.ARCHIVED
+            ),
             target_name="Past Target",
             ra=180.0,
             dec=45.0,

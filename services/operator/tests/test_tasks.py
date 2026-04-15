@@ -43,7 +43,7 @@ class TestCleanupSchedules:
         self, db_session, create_schedule, mocker
     ):
         """Test that past observations are moved to ARCHIVED status."""
-        create_schedule("test_observatory")
+        create_schedule("test_observatory", past_still_scheduled=True)
         mocker.patch(
             "app.tasks.cleanup_schedules.SessionLocal", return_value=db_session
         )

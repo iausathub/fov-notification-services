@@ -21,7 +21,10 @@ def _cleanup_schedules_sync() -> None:
             CursorResult[Any],
             db.execute(
                 update(Observation)
-                .where(Observation.start_time < now_utc)
+                .where(
+                    Observation.start_time < now_utc,
+                    Observation.status == ObservationStatus.SCHEDULED,
+                )
                 .values(status=ObservationStatus.ARCHIVED, archived_at=now_utc)
             ),
         )
