@@ -42,6 +42,21 @@ class MultipleScheduleResponse(BaseModel):
     schedules: list[ScheduleResponse]
 
 
+class HealpixPixelDirection(BaseModel):
+    """Direction of a single scheduled HEALPix pixel relative to the observatory.
+
+    The direction is the pixel centre expressed in the observatory's local
+    horizontal (AltAz) frame at ``time``. Because a fixed sky pixel's horizontal
+    direction changes as the Earth rotates, each entry is tied to the time of the
+    observation that scheduled it, and pixels are NOT deduplicated.
+    """
+
+    index: int
+    time: datetime
+    azimuth: float  # degrees, 0-360, measured from North towards East
+    altitude: float  # degrees, -90 to +90 above the horizon
+
+
 class HealpixScheduleResponse(BaseModel):
     """Healpix schedule response schema."""
 
@@ -59,6 +74,9 @@ class HealpixScheduleResponse(BaseModel):
     ordering: str
     pixel_indices: list[int]
     radius: int | None
+    # Populated only when the request sets include_direction=true. One entry per
+    # (pixel, observation) pair, so this list is not deduplicated.
+    pixel_directions: list[HealpixPixelDirection] | None = None
 
 
 class MultipleHealpixScheduleResponse(BaseModel):
