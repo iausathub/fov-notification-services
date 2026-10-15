@@ -1,7 +1,10 @@
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any, cast
 
+import astropy.units as u
 import numpy as np
+from astropy.coordinates import AltAz, EarthLocation, SkyCoord
+from astropy.time import Time
 from fastapi import APIRouter, Depends, Query
 from healpy import pixelfunc, query_disc
 from sqlalchemy import func
@@ -12,6 +15,7 @@ from app.dependencies import get_current_user
 from app.models.observation import Observation, ObservationStatus
 from app.models.schedule import Schedule
 from app.schemas.schedule import (
+    HealpixPixelDirection,
     HealpixScheduleResponse,
     MultipleHealpixScheduleResponse,
     MultipleScheduleResponse,
@@ -24,6 +28,8 @@ router = APIRouter(
     tags=["schedule"],
     dependencies=[Depends(get_current_user)],
 )
+
+RUBIN_RADIUS_DEG = 5
 
 
 def _get_healpix_indices(
@@ -61,7 +67,10 @@ def _get_healpix_indices_rubin(
             np.concatenate(
                 [
                     query_disc(
-                        nside=nside, vec=vec, radius=np.radians(5), nest=use_nested
+                        nside=nside,
+                        vec=vec,
+                        radius=np.radians(RUBIN_RADIUS_DEG),
+                        nest=use_nested,
                     )
                     for vec in vecs
                 ]
@@ -70,6 +79,64 @@ def _get_healpix_indices_rubin(
 
         return (covered_pixels.tolist(), nside, use_nested)
     return ([], nside, use_nested)
+
+
+def _compute_pixel_directions(
+    observations: list[Observation],
+    nside: int,
+    use_nested: bool,
+    radius: int | None,
+    location: EarthLocation,
+) -> list[HealpixPixelDirection]:
+    """Compute the AltAz direction of each scheduled HEALPix pixel as seen from the
+    observatory, at the time of the observation that scheduled it.
+
+    Unlike the deduplicated ``pixel_indices`` list, this keeps one entry per
+    (pixel, observation) pair, because the horizontal direction of a fixed sky pixel
+    changes as the Earth rotates.
+    """
+    pixels: list[int] = []
+    times: list[datetime] = []
+    for obs in observations:
+        if obs.ra is None or obs.dec is None:
+            continue
+        if radius is not None:
+            vec = pixelfunc.ang2vec(obs.ra, obs.dec, lonlat=True)
+            obs_pixels = query_disc(
+                nside=nside, vec=vec, radius=np.radians(radius), nest=use_nested
+            )
+        else:
+            obs_pixels = [
+                pixelfunc.ang2pix(nside, obs.ra, obs.dec, lonlat=True, nest=use_nested)
+            ]
+        for pixel in obs_pixels:
+            pixels.append(int(pixel))
+            times.append(obs.start_time)
+
+    if not pixels:
+        return []
+
+    # Pixel-centre sky coordinates (ICRS RA/Dec, degrees)
+    ras, decs = pixelfunc.pix2ang(nside, np.array(pixels), nest=use_nested, lonlat=True)
+
+    altaz = cast(
+        Any,
+        SkyCoord(ra=ras * u.deg, dec=decs * u.deg, frame="icrs").transform_to(
+            AltAz(obstime=Time(times), location=location)
+        ),
+    )
+    az_deg = np.asarray(altaz.az.deg, dtype=float)
+    alt_deg = np.asarray(altaz.alt.deg, dtype=float)
+
+    return [
+        HealpixPixelDirection(
+            index=pixels[i],
+            time=times[i],
+            azimuth=round(float(az_deg[i]), 8),
+            altitude=round(float(alt_deg[i]), 8),
+        )
+        for i in range(len(pixels))
+    ]
 
 
 @router.get("", response_model=MultipleScheduleResponse)
@@ -132,6 +199,13 @@ async def get_full_healpix_schedule(
     hours: int = Query(
         24, ge=1, le=48, description="Hours ahead to include (max 2 days)"
     ),
+    include_direction: bool = Query(
+        False,
+        description="If true, also return pixel_directions: the AltAz direction "
+        "(azimuth/altitude) of each scheduled HEALPix pixel relative to the "
+        "observatory, at the time of the observation that scheduled it. These are "
+        "not deduplicated.",
+    ),
 ):
 
     now = datetime.now(UTC)
@@ -158,9 +232,20 @@ async def get_full_healpix_schedule(
             healpix_indices, nside, use_nested = _get_healpix_indices_rubin(
                 filtered_obs
             )
-            radius = 5
+            radius = RUBIN_RADIUS_DEG
         else:
             healpix_indices, nside, use_nested = _get_healpix_indices(filtered_obs)
+
+        pixel_directions = None
+        if include_direction:
+            location = EarthLocation.from_geodetic(
+                lon=schedule.observatory_longitude * u.deg,
+                lat=schedule.observatory_latitude * u.deg,
+                height=schedule.observatory_elevation * u.m,
+            )
+            pixel_directions = _compute_pixel_directions(
+                filtered_obs, nside, use_nested, radius, location
+            )
 
         result.append(
             HealpixScheduleResponse(
@@ -176,6 +261,7 @@ async def get_full_healpix_schedule(
                 ordering="nested" if use_nested else "ring",
                 pixel_indices=healpix_indices,
                 radius=radius,
+                pixel_directions=pixel_directions,
             )
         )
 
@@ -256,6 +342,13 @@ async def get_healpix_observatory_schedule(
         description="Hours ahead to include. If not provided, returns all \
             scheduled observations.",
     ),
+    include_direction: bool = Query(
+        False,
+        description="If true, also return pixel_directions: the AltAz direction "
+        "(azimuth/altitude) of each scheduled HEALPix pixel relative to the "
+        "observatory, at the time of the observation that scheduled it. These are "
+        "not deduplicated.",
+    ),
 ):
     """Get HEALPix schedule for a specific observatory.
 
@@ -300,9 +393,20 @@ async def get_healpix_observatory_schedule(
     radius = None
     if schedule.observatory_name.lower() == "rubin":
         healpix_indices, nside, use_nested = _get_healpix_indices_rubin(filtered_obs)
-        radius = 5
+        radius = RUBIN_RADIUS_DEG
     else:
         healpix_indices, nside, use_nested = _get_healpix_indices(filtered_obs)
+
+    pixel_directions = None
+    if include_direction:
+        location = EarthLocation.from_geodetic(
+            lon=schedule.observatory_longitude * u.deg,
+            lat=schedule.observatory_latitude * u.deg,
+            height=schedule.observatory_elevation * u.m,
+        )
+        pixel_directions = _compute_pixel_directions(
+            filtered_obs, nside, use_nested, radius, location
+        )
 
     return HealpixScheduleResponse(
         observatory_name=schedule.observatory_name,
@@ -317,4 +421,5 @@ async def get_healpix_observatory_schedule(
         ordering="nested" if use_nested else "ring",
         pixel_indices=healpix_indices,
         radius=radius,
+        pixel_directions=pixel_directions,
     )

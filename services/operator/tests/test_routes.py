@@ -145,3 +145,50 @@ class TestScheduleRoutes:
         assert "pixel_indices" in data
         assert len(data["pixel_indices"]) == 24
         assert data["n_side"] == 32
+
+    def test_healpix_direction_absent_by_default(self, client, create_schedule):
+        """Without include_direction, pixel_directions should be omitted/null."""
+        create_schedule("test_observatory")
+        response = client.get("/schedule/test_observatory/healpix")
+        assert response.status_code == 200
+        assert response.json()["pixel_directions"] is None
+
+    def test_healpix_direction_included(self, client, create_schedule, db_session):
+        """With include_direction, each scheduled pixel gets an AltAz direction."""
+        schedule = create_schedule("test_observatory")
+        # The fixture uses an out-of-range latitude; set a real one so AltAz resolves.
+        schedule.observatory_latitude = -30.244633
+        schedule.observatory_longitude = -70.749417
+        db_session.commit()
+
+        response = client.get(
+            "/schedule/test_observatory/healpix?include_direction=true"
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        # One SCHEDULED future observation -> one (non-deduplicated) pixel direction.
+        directions = data["pixel_directions"]
+        assert directions is not None
+        assert len(directions) == len(data["pixel_indices"]) == 1
+
+        entry = directions[0]
+        assert entry["index"] == data["pixel_indices"][0]
+        assert "time" in entry
+        assert 0.0 <= entry["azimuth"] <= 360.0
+        assert -90.0 <= entry["altitude"] <= 90.0
+
+    def test_healpix_direction_included_all_observatories(
+        self, client, create_schedule, db_session
+    ):
+        """include_direction also works on the combined (all observatories) endpoint."""
+        schedule = create_schedule("Observatory_A")
+        schedule.observatory_latitude = -30.244633
+        schedule.observatory_longitude = -70.749417
+        db_session.commit()
+
+        response = client.get("/schedule/healpix?include_direction=true")
+        assert response.status_code == 200
+        schedules = response.json()["schedules"]
+        assert len(schedules) == 1
+        assert len(schedules[0]["pixel_directions"]) == 1
